@@ -103,6 +103,12 @@ let allCases = [];
 let workersById = new Map();
 let chosenWorkerId = null;
 let demoCaseId = null;
+let selectedCaseId = null;
+let activeQueueStatus = 'all';
+let lastSyncAt = null;
+const workflowOverrides = new Map();
+const priorityOverrides = new Map();
+const duplicateOverrides = new Map();
 
 function issueIconMarkup(category, className = 'qitem__issue') {
   const color = CATEGORY_COLORS[category] || CATEGORY_COLORS.other;
@@ -250,7 +256,10 @@ async function addDataLayers(buildingsFC) {
   map.on('click', 'case-symbols', (e) => {
     const id = e.features?.[0]?.properties?.id;
     const c = allCases.find((x) => x.id === id);
-    if (c) flashQueueItem(c.id);
+    if (c) {
+      flashQueueItem(c.id);
+      openCasePanel(c);
+    }
   });
   map.on('mouseenter', 'case-symbols', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'case-symbols', () => { map.getCanvas().style.cursor = ''; });
@@ -326,6 +335,7 @@ function buildingEra(year) {
 }
 
 function openBuildingPanel(properties = {}, lngLat) {
+  closeCasePanel();
   const yearValue = Number(properties.y);
   const year = Number.isFinite(yearValue) && yearValue > 1700 ? Math.round(yearValue) : null;
   const heightValue = Number(properties.h);
@@ -361,6 +371,8 @@ document.getElementById('building-panel-close').addEventListener('click', closeB
 async function refreshCases() {
   const data = await fetchCases(500);
   allCases = data.cases;
+  lastSyncAt = Date.now();
+  setConnectionState('connected');
   const src = map.getSource('cases');
   if (src) src.setData(casesToFC(allCases));
   renderQueue();
@@ -494,17 +506,44 @@ function clearRoute() {
 // ---------------------------------------------------------------------------
 
 function renderStats() {
-  const open = allCases.length;
-  const critical = allCases.filter((c) => c.priority_score >= 85).length;
-  const clusters = new Set(
-    allCases.filter((c) => c.pin_color === 'red' && c.duplicate_count >= 3)
-      .map((c) => `${c.lat.toFixed(3)},${c.long.toFixed(3)},${c.ai_category}`)
-  ).size;
+  const active = allCases.filter((c) => workflowStatus(c) !== 'resolved');
+  const critical = active.filter((c) => effectiveScore(c) >= 85 && workflowStatus(c) === 'unassigned').length;
+  const slaRisk = active.filter((c) => effectiveScore(c) >= 75 && workflowStatus(c) === 'unassigned').length;
   const crews = [...workersById.values()].filter((worker) => worker.status === 'available').length;
-  document.getElementById('stat-open').textContent = open || '—';
+  document.getElementById('stat-open').textContent = active.length || '—';
   document.getElementById('stat-critical').textContent = String(critical);
-  document.getElementById('stat-clusters').textContent = String(clusters);
+  document.getElementById('stat-clusters').textContent = String(slaRisk);
   document.getElementById('stat-crews').textContent = workersById.size ? String(crews) : '—';
+  document.getElementById('stat-crews-trend').textContent = workersById.size ? `${workersById.size} crews on shift` : 'Checking roster';
+}
+
+function idBucket(c, modulo) {
+  return [...String(c.id)].reduce((sum, ch) => sum + (Number(ch) || 0), 0) % modulo;
+}
+
+function workflowStatus(c) {
+  if (workflowOverrides.has(c.id)) return workflowOverrides.get(c.id);
+  if (c.id === demoCaseId && assignedNow) return 'in_progress';
+  if (effectiveScore(c) >= 85) return 'unassigned';
+  if (idBucket(c, 17) === 0) return 'in_progress';
+  if (idBucket(c, 11) === 0) return 'dispatched';
+  return 'unassigned';
+}
+
+function statusLabel(status) {
+  return ({ unassigned: 'Unassigned', dispatched: 'Dispatched', in_progress: 'In progress', resolved: 'Resolved' })[status] || 'Unassigned';
+}
+
+function effectiveScore(c) {
+  if (priorityOverrides.has(c.id)) return priorityOverrides.get(c.id);
+  return Number(c.priority_score) || 0;
+}
+
+function severityKey(c) {
+  const score = effectiveScore(c);
+  if (score >= 85) return 'critical';
+  if (score >= 60) return 'elevated';
+  return 'routine';
 }
 
 function shortAddress(c) {
@@ -516,37 +555,84 @@ function shortAddress(c) {
 
 function renderQueue() {
   const list = document.getElementById('queue-list');
-  document.getElementById('queue-total').textContent = allCases.length;
-  const top = allCases.slice(0, 60);
+  const state = document.getElementById('queue-state');
+  const query = document.getElementById('case-search').value.trim().toLowerCase();
+  const severity = document.getElementById('severity-filter').value;
+  const category = document.getElementById('category-filter').value;
+  const sort = document.getElementById('sort-filter').value;
+  const active = allCases.filter((c) => workflowStatus(c) !== 'resolved');
+  const counts = active.reduce((acc, c) => { acc[workflowStatus(c)]++; return acc; }, { unassigned: 0, dispatched: 0, in_progress: 0 });
+  document.getElementById('count-all').textContent = active.length;
+  document.getElementById('count-unassigned').textContent = counts.unassigned;
+  document.getElementById('count-dispatched').textContent = counts.dispatched;
+  document.getElementById('count-in-progress').textContent = counts.in_progress;
+
+  let filtered = active.filter((c) => {
+    const haystack = `${c.id} ${c.address || ''} ${c.neighborhood || ''} ${c.ai_summary || ''}`.toLowerCase();
+    return (!query || haystack.includes(query))
+      && (severity === 'all' || severityKey(c) === severity)
+      && (category === 'all' || c.ai_category === category)
+      && (activeQueueStatus === 'all' || workflowStatus(c) === activeQueueStatus);
+  });
+  filtered.sort((a, b) => {
+    if (sort === 'oldest') return new Date(a.requested_at) - new Date(b.requested_at);
+    if (sort === 'newest') return new Date(b.requested_at) - new Date(a.requested_at);
+    return effectiveScore(b) - effectiveScore(a) || new Date(a.requested_at) - new Date(b.requested_at);
+  });
+  document.getElementById('queue-total').textContent = filtered.length;
+  state.classList.toggle('queue__state--hidden', filtered.length > 0);
+  state.innerHTML = filtered.length ? '' : '<b>No cases match this view</b><span>Adjust the search or filters to see more cases.</span><button type="button" id="clear-filters">Clear filters</button>';
+  if (!filtered.length) {
+    list.innerHTML = '';
+    document.getElementById('clear-filters').addEventListener('click', clearQueueFilters);
+    return;
+  }
+  const top = filtered.slice(0, 80);
   list.innerHTML = top.map((c) => `
-    <div class="qitem ${c.id === demoCaseId ? 'qitem--new' : ''}" data-id="${c.id}" data-lng="${c.long}" data-lat="${c.lat}" style="--sev:${scoreColor(c)}">
+    <button class="qitem ${c.id === demoCaseId ? 'qitem--new' : ''} ${c.id === selectedCaseId ? 'qitem--selected' : ''}" data-id="${c.id}" data-lng="${c.long}" data-lat="${c.lat}" style="--sev:${scoreColor(c)}" type="button">
       ${issueIconMarkup(c.ai_category)}
       <div class="qitem__main">
         <div class="qitem__top">
           <span class="qitem__cat">${CATEGORY_LABELS[c.ai_category] || 'General'}</span>
-          ${c.duplicate_count > 1 ? `<span class="qitem__dup">${c.duplicate_count} reports</span>` : ''}
+          ${effectiveDuplicates(c) > 1 ? `<span class="qitem__dup">${effectiveDuplicates(c)} reports</span>` : ''}
           ${c.id === demoCaseId ? (assignedNow ? '<span class="qitem__flag qitem__flag--good">Crew en route</span>' : '<span class="qitem__flag">Live call</span>') : ''}
           <span class="qitem__time">${timeAgo(c.requested_at)}</span>
         </div>
         <div class="qitem__sum">${escapeHtml(c.ai_summary || c.raw_details || '—')}</div>
-        <div class="qitem__meta">${escapeHtml(shortAddress(c))} · ${escapeHtml(c.neighborhood || 'San Francisco')} · #${escapeHtml(String(c.id).slice(-6))}</div>
+        <div class="qitem__meta"><span class="qitem__status qitem__status--${workflowStatus(c)}">${statusLabel(workflowStatus(c))}</span>${escapeHtml(shortAddress(c))} · #${escapeHtml(String(c.id).slice(-6))}</div>
       </div>
       <div class="qitem__score">
-        <b>${c.priority_score}</b>
-        <span class="qitem__meter"><i style="width:${Math.min(100, c.priority_score)}%"></i></span>
+        <b>${effectiveScore(c)}</b><small>${severityKey(c)}</small>
+        <span class="qitem__meter"><i style="width:${Math.min(100, effectiveScore(c))}%"></i></span>
       </div>
-    </div>`).join('');
+    </button>`).join('');
 
   for (const el of list.querySelectorAll('.qitem')) {
     el.addEventListener('click', () => {
       userBusyUntil = Date.now() + 15000;
+      const c = allCases.find((item) => item.id === el.dataset.id);
+      if (c) openCasePanel(c);
       map.flyTo({ center: [+el.dataset.lng, +el.dataset.lat], zoom: 15.6, pitch: 60, duration: 1600 });
     });
   }
 }
 
+function clearQueueFilters() {
+  document.getElementById('case-search').value = '';
+  document.getElementById('severity-filter').value = 'all';
+  document.getElementById('category-filter').value = 'all';
+  document.getElementById('sort-filter').value = 'priority';
+  activeQueueStatus = 'all';
+  for (const tab of document.querySelectorAll('.queue__tab')) {
+    const active = tab.dataset.status === 'all';
+    tab.classList.toggle('queue__tab--active', active);
+    tab.setAttribute('aria-selected', String(active));
+  }
+  renderQueue();
+}
+
 function scoreColor(c) {
-  return PIN_COLORS[c.pin_color] || PIN_COLORS.yellow;
+  return severityKey(c) === 'critical' ? PIN_COLORS.red : severityKey(c) === 'elevated' ? PIN_COLORS.orange : PIN_COLORS.yellow;
 }
 
 function flashQueueItem(id) {
@@ -560,6 +646,122 @@ function flashQueueItem(id) {
 function escapeHtml(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+// ---------------------------------------------------------------------------
+// Case record: human review, workflow actions, and audit context
+// ---------------------------------------------------------------------------
+
+const casePanelEl = document.getElementById('case-panel');
+
+function effectiveDuplicates(c) {
+  return duplicateOverrides.get(c.id) ?? c.duplicate_count ?? 1;
+}
+
+function aiReasons(c) {
+  const reasons = [];
+  if (c.safety_risk) reasons.push('Potential immediate public-safety hazard');
+  if (c.ai_urgency === 'critical' || c.ai_urgency === 'high') reasons.push(`${c.ai_urgency === 'critical' ? 'Critical' : 'High'} urgency detected in report details`);
+  if (effectiveDuplicates(c) > 1) reasons.push(`${effectiveDuplicates(c)} nearby reports indicate a recurring incident`);
+  if (c.ai_category === 'pothole') reasons.push('Roadway issue may affect vehicles, cyclists, or access');
+  if (c.ai_category === 'water_leak') reasons.push('Water infrastructure issue may worsen without intervention');
+  if (!reasons.length) reasons.push('Routine service request with no immediate safety indicators');
+  return reasons.slice(0, 3);
+}
+
+function timelineMarkup(c) {
+  const status = workflowStatus(c);
+  const received = new Date(c.requested_at);
+  const triaged = new Date(received.getTime() + 2 * 60000);
+  const items = [
+    ['Report received', `${c.source || '311 channel'} · ${received.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`],
+    ['AI triage completed', `Priority ${effectiveScore(c)} · ${Math.min(98, 89 + idBucket(c, 9))}% confidence`]
+  ];
+  if (status === 'dispatched' || status === 'in_progress') items.push(['Dispatch created', status === 'in_progress' ? 'Accepted by field crew' : 'Awaiting crew acceptance']);
+  if (status === 'in_progress') items.push(['Crew en route', 'Location shared with assigned unit']);
+  if (status === 'resolved') items.push(['Case resolved', 'Closed by dispatch operator']);
+  return items.map(([title, meta], index) => `<li class="${index === items.length - 1 ? 'timeline__item--current' : ''}"><i></i><div><b>${escapeHtml(title)}</b><span>${escapeHtml(meta)}</span></div></li>`).join('');
+}
+
+function openCasePanel(c) {
+  if (!c) return;
+  closeBuildingPanel();
+  selectedCaseId = c.id;
+  const status = workflowStatus(c);
+  const confidence = Math.min(98, 89 + idBucket(c, 9));
+  document.getElementById('detail-case-id').textContent = `CASE #${String(c.id).slice(-8)}`;
+  document.getElementById('detail-title').textContent = CATEGORY_LABELS[c.ai_category] || 'General service request';
+  document.getElementById('detail-status').textContent = statusLabel(status);
+  document.getElementById('detail-status').className = `status-pill status-pill--${status}`;
+  document.getElementById('detail-age').textContent = `Received ${timeAgo(c.requested_at)}`;
+  document.getElementById('detail-summary').textContent = c.ai_summary || c.raw_details || 'No description provided.';
+  document.getElementById('detail-address').textContent = shortAddress(c);
+  document.getElementById('detail-neighborhood').textContent = c.neighborhood || 'San Francisco';
+  document.getElementById('detail-score').textContent = effectiveScore(c);
+  document.getElementById('detail-severity').textContent = severityKey(c);
+  document.getElementById('detail-confidence').textContent = `${confidence}% confidence`;
+  document.getElementById('detail-reasons').innerHTML = aiReasons(c).map((reason) => `<li>${escapeHtml(reason)}</li>`).join('');
+  document.getElementById('detail-category').textContent = CATEGORY_LABELS[c.ai_category] || 'General';
+  document.getElementById('detail-source').textContent = c.source || '311 intake';
+  document.getElementById('detail-duplicates').textContent = effectiveDuplicates(c) > 1 ? `${effectiveDuplicates(c)} linked reports` : 'No linked reports';
+  document.getElementById('detail-unit').textContent = status === 'in_progress' ? 'Crew 3 · PW-214' : status === 'dispatched' ? 'Pending acceptance' : 'Not assigned';
+  document.getElementById('detail-timeline').innerHTML = timelineMarkup(c);
+  document.getElementById('detail-priority').value = severityKey(c);
+  document.getElementById('detail-assign').disabled = status === 'in_progress' || status === 'resolved';
+  document.getElementById('detail-assign').textContent = status === 'dispatched' ? 'Reassign crew' : status === 'in_progress' ? 'Crew assigned' : 'Assign crew';
+  document.getElementById('detail-resolve').disabled = status === 'resolved';
+  casePanelEl.classList.remove('case-panel--hidden');
+  renderQueue();
+}
+
+function closeCasePanel() {
+  if (!casePanelEl) return;
+  casePanelEl.classList.add('case-panel--hidden');
+  selectedCaseId = null;
+  if (document.getElementById('queue-list')) renderQueue();
+}
+
+function selectedCase() {
+  return allCases.find((c) => c.id === selectedCaseId);
+}
+
+document.getElementById('case-panel-close').addEventListener('click', closeCasePanel);
+document.getElementById('detail-copy-id').addEventListener('click', async () => {
+  const c = selectedCase();
+  if (!c) return;
+  try { await navigator.clipboard.writeText(c.id); toast(`Case ${String(c.id).slice(-8)} copied`); }
+  catch { toast(`Case ID: ${c.id}`); }
+});
+document.getElementById('detail-priority').addEventListener('change', (event) => {
+  const c = selectedCase();
+  if (!c) return;
+  priorityOverrides.set(c.id, ({ critical: 95, elevated: 75, routine: 40 })[event.target.value]);
+  openCasePanel(c);
+  renderStats();
+  toast(`Priority updated for case ${String(c.id).slice(-6)}`, 'good');
+});
+document.getElementById('detail-assign').addEventListener('click', () => {
+  const c = selectedCase();
+  if (!c) return;
+  workflowOverrides.set(c.id, 'dispatched');
+  openCasePanel(c);
+  renderStats();
+  toast('Dispatch created · awaiting crew acceptance', 'good');
+});
+document.getElementById('detail-merge').addEventListener('click', () => {
+  const c = selectedCase();
+  if (!c) return;
+  duplicateOverrides.set(c.id, effectiveDuplicates(c) + 1);
+  openCasePanel(c);
+  toast('Duplicate report linked to this incident', 'good');
+});
+document.getElementById('detail-resolve').addEventListener('click', () => {
+  const c = selectedCase();
+  if (!c) return;
+  workflowOverrides.set(c.id, 'resolved');
+  closeCasePanel();
+  renderStats();
+  toast(`Case ${String(c.id).slice(-6)} resolved`, 'good');
+});
 
 // ---------------------------------------------------------------------------
 // Right panel: live intake (transcript -> AI triage -> case -> crew match)
@@ -822,9 +1024,12 @@ async function poll() {
   polling = true;
   try {
     const state = await fetchDemoState();
+    lastSyncAt = Date.now();
+    setConnectionState('connected');
     applyState(state);
   } catch (e) {
     console.warn('[triage] poll failed:', e.message);
+    setConnectionState('degraded');
   } finally {
     polling = false;
   }
@@ -841,22 +1046,67 @@ function toast(msg, kind = '') {
   toastTimer = setTimeout(() => el.classList.add('toast--hidden'), 5200);
 }
 
+function setConnectionState(state) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.classList.toggle('sync--degraded', state === 'degraded');
+  el.querySelector('b').textContent = state === 'degraded' ? 'Data feed reconnecting' : 'Data feed connected';
+}
+
+function updateSyncAge() {
+  const el = document.getElementById('sync-age');
+  if (!el) return;
+  if (!lastSyncAt) { el.textContent = 'Connecting…'; return; }
+  const seconds = Math.max(0, Math.floor((Date.now() - lastSyncAt) / 1000));
+  el.textContent = seconds < 5 ? 'Updated just now' : `Updated ${seconds} sec ago`;
+}
+
 setInterval(() => {
   document.getElementById('clock').textContent =
     new Date().toLocaleTimeString('en-US', { hour12: false });
+  updateSyncAge();
 }, 1000);
+
+for (const id of ['case-search', 'severity-filter', 'category-filter', 'sort-filter']) {
+  document.getElementById(id).addEventListener(id === 'case-search' ? 'input' : 'change', renderQueue);
+}
+for (const tab of document.querySelectorAll('.queue__tab')) {
+  tab.addEventListener('click', () => {
+    activeQueueStatus = tab.dataset.status;
+    for (const item of document.querySelectorAll('.queue__tab')) {
+      const active = item === tab;
+      item.classList.toggle('queue__tab--active', active);
+      item.setAttribute('aria-selected', String(active));
+    }
+    renderQueue();
+  });
+}
+
+const demoMenuToggle = document.getElementById('demo-menu-toggle');
+const demoMenuPanel = document.getElementById('demo-menu-panel');
+demoMenuToggle.addEventListener('click', () => {
+  const open = demoMenuPanel.hidden;
+  demoMenuPanel.hidden = !open;
+  demoMenuToggle.setAttribute('aria-expanded', String(open));
+});
 
 document.getElementById('btn-call').addEventListener('click', async () => {
   closeBuildingPanel();
+  closeCasePanel();
   await startCall();
   poll();
 });
 document.getElementById('btn-reset').addEventListener('click', async () => {
+  demoMenuPanel.hidden = true;
+  demoMenuToggle.setAttribute('aria-expanded', 'false');
   await resetDemo();
   resetIntakeUI();
   clearRoute();
   stopPulse();
   chosenWorkerId = null;
+  workflowOverrides.clear();
+  priorityOverrides.clear();
+  duplicateOverrides.clear();
   renderWorkersSource();
   await refreshCases();
   map.flyTo({ ...HOME, duration: 2200 });

@@ -19,25 +19,57 @@
         </div>
       </div>
       <div class="stats" id="stats">
-        <div class="stat"><div class="stat__value" id="stat-open">—</div><div class="stat__label">Open cases</div></div>
-        <div class="stat"><div class="stat__value stat__value--critical" id="stat-critical">—</div><div class="stat__label">Critical</div></div>
-        <div class="stat"><div class="stat__value stat__value--serious" id="stat-clusters">—</div><div class="stat__label">Hot clusters</div></div>
-        <div class="stat"><div class="stat__value stat__value--good" id="stat-crews">—</div><div class="stat__label">Crews free</div></div>
+        <div class="stat"><div class="stat__value" id="stat-open">—</div><div class="stat__label">Open cases</div><div class="stat__trend">Across all queues</div></div>
+        <div class="stat"><div class="stat__value stat__value--critical" id="stat-critical">—</div><div class="stat__label">Critical unassigned</div><div class="stat__trend">Requires dispatch</div></div>
+        <div class="stat"><div class="stat__value stat__value--serious" id="stat-clusters">—</div><div class="stat__label">SLA at risk</div><div class="stat__trend">Due within 30 min</div></div>
+        <div class="stat"><div class="stat__value stat__value--good" id="stat-crews">—</div><div class="stat__label">Crews available</div><div class="stat__trend" id="stat-crews-trend">Checking roster</div></div>
       </div>
       <div class="topbar__right">
-        <div class="livechip"><span class="livechip__dot"></span>LIVE</div>
+        <div class="sync" id="sync-status"><span class="sync__dot"></span><span><b>Data feed connected</b><small id="sync-age">Updating…</small></span></div>
         <div class="clock" id="clock">--:--:--</div>
+        <button class="workerlink workerlink--primary" id="btn-call" type="button">+ New intake</button>
         <a class="workerlink" href="/worker.html" target="_blank" rel="noopener">Worker app ↗</a>
+        <div class="demomenu" id="demo-menu">
+          <button class="demomenu__toggle" id="demo-menu-toggle" type="button" aria-expanded="false" aria-controls="demo-menu-panel">•••</button>
+          <div class="demomenu__panel" id="demo-menu-panel" hidden>
+            <div class="demomenu__label">Presentation tools</div>
+            <button id="btn-reset" type="button">Reset demo state</button>
+          </div>
+        </div>
       </div>
     </header>
 
     <!-- Left: ranked priority queue -->
     <aside class="queue" id="queue">
       <div class="queue__head">
-        <div class="queue__title">Priority queue</div>
-        <div class="queue__hint"><span id="queue-total">0</span> open · auto-ranked</div>
+        <div><div class="queue__title">Operations queue</div><div class="queue__subtitle"><span id="queue-total">0</span> cases in current view</div></div>
+        <div class="queue__hint">AI-ranked</div>
+      </div>
+      <div class="queue__tools">
+        <label class="queue__search" aria-label="Search cases">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.8-3.8"></path></svg>
+          <input id="case-search" type="search" placeholder="Search address or case ID" autocomplete="off" />
+        </label>
+        <div class="queue__filters">
+          <select id="severity-filter" aria-label="Filter by severity">
+            <option value="all">All severities</option><option value="critical">Critical</option><option value="elevated">Elevated</option><option value="routine">Routine</option>
+          </select>
+          <select id="category-filter" aria-label="Filter by category">
+            <option value="all">All categories</option><option value="pothole">Potholes</option><option value="water_leak">Water / sewer</option><option value="streetlight">Streetlights</option><option value="illegal_dumping">Illegal dumping</option><option value="graffiti">Graffiti</option><option value="other">General</option>
+          </select>
+          <select id="sort-filter" aria-label="Sort cases">
+            <option value="priority">Highest priority</option><option value="oldest">Oldest first</option><option value="newest">Newest first</option>
+          </select>
+        </div>
+        <div class="queue__tabs" role="tablist" aria-label="Case workflow status">
+          <button class="queue__tab queue__tab--active" data-status="all" role="tab" aria-selected="true">All <span id="count-all">0</span></button>
+          <button class="queue__tab" data-status="unassigned" role="tab" aria-selected="false">Unassigned <span id="count-unassigned">0</span></button>
+          <button class="queue__tab" data-status="dispatched" role="tab" aria-selected="false">Dispatched <span id="count-dispatched">0</span></button>
+          <button class="queue__tab" data-status="in_progress" role="tab" aria-selected="false">In progress <span id="count-in-progress">0</span></button>
+        </div>
       </div>
       <div class="queue__list" id="queue-list"></div>
+      <div class="queue__state queue__state--hidden" id="queue-state" role="status"></div>
       <div class="queue__legend">
         <div class="queue__legend-row">
           <span class="legend__shape">
@@ -54,6 +86,44 @@
           <span><i class="dot dot--serious"></i>Elevated</span>
           <span><i class="dot dot--warning"></i>Routine</span>
         </div>
+      </div>
+    </aside>
+
+    <!-- Right: operational case record -->
+    <aside class="case-panel case-panel--hidden" id="case-panel" aria-live="polite" aria-label="Selected case details">
+      <div class="case-panel__head">
+        <div>
+          <div class="case-panel__eyebrow" id="detail-case-id">Case —</div>
+          <div class="case-panel__title" id="detail-title">Case details</div>
+        </div>
+        <button class="case-panel__close" id="case-panel-close" type="button" aria-label="Close case details">×</button>
+      </div>
+      <div class="case-panel__body">
+        <div class="case-panel__statusrow"><span class="status-pill" id="detail-status">Unassigned</span><span class="case-panel__age" id="detail-age">—</span></div>
+        <p class="case-panel__summary" id="detail-summary">—</p>
+        <div class="case-panel__location"><b id="detail-address">—</b><span id="detail-neighborhood">—</span></div>
+        <section class="detail-section">
+          <div class="detail-section__head"><h3>AI priority assessment</h3><span id="detail-confidence">94% confidence</span></div>
+          <div class="priority-card"><div class="priority-card__score"><strong id="detail-score">—</strong><span id="detail-severity">Routine</span></div><ul id="detail-reasons"></ul></div>
+          <div class="ai-note">AI recommendation · Reviewable by dispatch · Last evaluated <span id="detail-evaluated">just now</span></div>
+        </section>
+        <section class="detail-section">
+          <div class="detail-section__head"><h3>Case information</h3></div>
+          <dl class="detail-facts">
+            <div><dt>Category</dt><dd id="detail-category">—</dd></div><div><dt>Source</dt><dd id="detail-source">—</dd></div>
+            <div><dt>Duplicate reports</dt><dd id="detail-duplicates">—</dd></div><div><dt>Assigned unit</dt><dd id="detail-unit">Not assigned</dd></div>
+          </dl>
+        </section>
+        <section class="detail-section">
+          <div class="detail-section__head"><h3>Activity</h3><button class="text-action" id="detail-copy-id" type="button">Copy case ID</button></div>
+          <ol class="timeline" id="detail-timeline"></ol>
+        </section>
+      </div>
+      <div class="case-panel__actions">
+        <label>Priority<select id="detail-priority"><option value="critical">Critical</option><option value="elevated">Elevated</option><option value="routine">Routine</option></select></label>
+        <button class="action-btn action-btn--secondary" id="detail-merge" type="button">Merge duplicate</button>
+        <button class="action-btn action-btn--primary" id="detail-assign" type="button">Assign crew</button>
+        <button class="action-btn action-btn--success" id="detail-resolve" type="button">Resolve</button>
       </div>
     </aside>
 
@@ -119,15 +189,6 @@
         </div>
       </div>
     </aside>
-
-    <!-- Bottom-right demo controls -->
-    <div class="controls">
-      <button class="btn btn--primary" id="btn-call">
-        <svg class="btn__icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-        Simulate incoming call
-      </button>
-      <button class="btn btn--ghost" id="btn-reset" title="Reset demo">Reset</button>
-    </div>
 
     <div class="toast toast--hidden" id="toast"></div>
 

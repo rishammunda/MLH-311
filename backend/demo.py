@@ -5,16 +5,18 @@ moment the call starts, so the dashboard and the worker phone can both poll
 ``GET /api/demo/state`` and stay perfectly in sync with zero push
 infrastructure.
 
-The "AI extraction" step shells out to ``codex exec`` in a background thread
-(no API key needed). If codex is slow, missing, or returns junk, the scripted
-fallback fields are used instead — the demo never stalls on the model.
+The "AI extraction" step calls DigitalOcean's Gradient AI serverless inference
+(OpenAI-compatible) in a background thread, kicked off the moment the call
+starts so the result is ready by the on-screen reveal. If the model is slow,
+the key is missing, or it returns junk, the scripted fallback fields are used
+instead — the demo never stalls on the model.
 """
 from __future__ import annotations
 
 import json
 import math
+import os
 import re
-import subprocess
 import threading
 import time
 from typing import Any, Optional
@@ -223,7 +225,7 @@ _state: dict[str, Any] = {
     "started_at": None,     # float epoch seconds, None = idle
     "case_created": False,
     "accepted_at": None,
-    "codex_extraction": None,  # dict once the codex thread returns
+    "codex_extraction": None,  # dict once the extraction thread returns (DO Gradient AI)
     "scenario_id": DEMO_SCENARIOS[0]["id"],
 }
 
@@ -263,8 +265,35 @@ def _extraction_fields() -> dict[str, str]:
     return fields
 
 
-def _run_codex_extraction(scenario_id: str) -> None:
-    """Ask codex to triage the transcript. Best-effort, deterministic fallback."""
+# DigitalOcean Gradient AI serverless inference (OpenAI-compatible).
+_DO_BASE_URL = os.getenv("DO_INFERENCE_BASE_URL", "https://inference.do-ai.run/v1")
+_DO_MODEL = os.getenv("DO_MODEL", "openai-gpt-oss-20b")
+_do_client = None
+
+
+def _get_do_client():
+    """Lazily build the OpenAI-compatible client pointed at DigitalOcean.
+
+    Returns None if the SDK isn't installed or no model access key is set, so
+    the caller cleanly falls back to the scripted extraction fields.
+    """
+    global _do_client
+    if _do_client is not None:
+        return _do_client
+    key = os.getenv("DIGITALOCEAN_INFERENCE_KEY")
+    if not key:
+        return None
+    try:
+        from openai import OpenAI
+    except ImportError:
+        return None
+    _do_client = OpenAI(base_url=_DO_BASE_URL, api_key=key)
+    return _do_client
+
+
+def _run_extraction(scenario_id: str) -> None:
+    """Triage the transcript via DigitalOcean Gradient AI. Best-effort, with a
+    deterministic scripted fallback so the demo never stalls on the model."""
     scenario = SCENARIOS_BY_ID.get(scenario_id, DEMO_SCENARIOS[0])
     transcript = "\n".join(f"{ln['speaker'].upper()}: {ln['text']}" for ln in scenario["transcript"])
     prompt = (
@@ -275,15 +304,22 @@ def _run_codex_extraction(scenario_id: str) -> None:
         '"summary": "<one sentence, max 25 words>"}\n\n'
         f"TRANSCRIPT:\n{transcript}"
     )
+
+    client = _get_do_client()
+    if client is None:
+        print("[demo] DO inference key not set; using scripted extraction fields")
+        return
+
     try:
-        result = subprocess.run(
-            ["codex", "exec", "--skip-git-repo-check", "-s", "read-only", prompt],
-            capture_output=True, text=True, timeout=60,
+        resp = client.chat.completions.create(
+            model=_DO_MODEL,
+            max_completion_tokens=256,
+            messages=[{"role": "user", "content": prompt}],
         )
-        # codex echoes the prompt (which contains a JSON template), so parse
-        # candidates back-to-front and reject anything that still looks like
-        # the template rather than a real answer.
-        for match in reversed(re.findall(r"\{[^{}]*\}", result.stdout, re.DOTALL)):
+        content = resp.choices[0].message.content or ""
+        # Parse JSON candidates back-to-front; reject anything that still looks
+        # like the template (contains "<" placeholders or "|" option lists).
+        for match in reversed(re.findall(r"\{[^{}]*\}", content, re.DOTALL)):
             try:
                 parsed = json.loads(match)
             except json.JSONDecodeError:
@@ -292,15 +328,16 @@ def _run_codex_extraction(scenario_id: str) -> None:
             if "<" in values or "|" in values:
                 continue
             with _lock:
+                # Guard against a stale thread from a previous/reset call.
                 if _state.get("scenario_id") != scenario_id:
                     return
                 _state["codex_extraction"] = parsed
-            print(f"[demo] codex extraction: {parsed}")
+            print(f"[demo] DO Gradient AI extraction: {parsed}")
             break
         else:
-            print(f"[demo] codex gave no usable JSON; using scripted fields")
-    except Exception as e:  # demo must never depend on codex succeeding
-        print(f"[demo] codex extraction unavailable ({e}); using scripted fields")
+            print("[demo] DO gave no usable JSON; using scripted fields")
+    except Exception as e:  # demo must never depend on the model succeeding
+        print(f"[demo] DO extraction unavailable ({e}); using scripted fields")
 
 
 def _build_case(fields: dict[str, str]) -> Case:
@@ -421,7 +458,7 @@ def demo_state() -> dict[str, Any]:
             "extraction": {
                 "revealed": revealed,
                 "fields": {k: fields[k] for k in revealed},
-                "source": "codex" if _state.get("codex_extraction") else "scripted",
+                "source": "gradient-ai" if _state.get("codex_extraction") else "scripted",
             },
             "case": case.model_dump() if case else None,
             "recommendation": recommendation,
@@ -449,7 +486,7 @@ async def start_call(scenario_id: Optional[str] = None):
             _state["scenario_id"] = scenario_id
         _state["started_at"] = _now()
     threading.Thread(
-        target=_run_codex_extraction,
+        target=_run_extraction,
         args=(_state["scenario_id"],),
         daemon=True,
     ).start()

@@ -2,7 +2,8 @@
 # Deploy with: doctl apps create --spec .do/app.yaml
 # (or paste into the DO dashboard: Apps > Create > from this repo)
 #
-# Set ANTHROPIC_API_KEY as an encrypted secret in the DO dashboard.
+# Set DIGITALOCEAN_INFERENCE_KEY (a Gradient AI model access key) as an
+# encrypted secret in the DO dashboard.
 
 name: sf311-live-triage
 region: sfo
@@ -20,9 +21,12 @@ services:
     instance_size_slug: basic-xxs
     instance_count: 1
     envs:
-      - key: ANTHROPIC_API_KEY
+      - key: DIGITALOCEAN_INFERENCE_KEY
         scope: RUN_TIME
         type: SECRET
+      - key: DO_MODEL
+        scope: RUN_TIME
+        value: "openai-gpt-oss-20b"
       - key: SF_APP_TOKEN
         scope: RUN_TIME
         value: ""

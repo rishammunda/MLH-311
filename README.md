@@ -37,8 +37,9 @@ recommended → the task lands on the worker phone → accepting it updates the 
 **Reset** puts everything back. Full walkthrough + 2-minute script: [docs/DEMO.md](docs/DEMO.md).
 
 Demo mode needs **no API keys and no network data feed** — it runs from a frozen snapshot of
-real SF311 data. The live AI-extraction step shells out to `codex exec` if available and
-falls back to scripted values, so the demo works every time.
+real SF311 data. The live AI-extraction step calls DigitalOcean Gradient AI when a
+`DIGITALOCEAN_INFERENCE_KEY` is set, and falls back to scripted values otherwise, so the
+demo works every time.
 
 ## Quick start (backend only, live-ingest mode)
 
@@ -46,7 +47,7 @@ falls back to scripted values, so the demo works every time.
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # add ANTHROPIC_API_KEY
+cp .env.example .env          # add DIGITALOCEAN_INFERENCE_KEY
 uvicorn main:app --reload --port 8000
 # → http://localhost:8000/cases
 ```

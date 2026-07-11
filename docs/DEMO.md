@@ -40,7 +40,7 @@ on the same Wi-Fi (add `--host` to `npm run dev` / edit `vite.config.js` `server
 | --- | --- | --- |
 | 0:00–0:45 | **The problem + the city** | Talk over the idle dashboard: 396 real 311 reports, AI-ranked queue on the left, red = clustered/critical, crew chips are field workers. The camera slowly orbits on its own. |
 | 0:45–1:05 | **The call** | Click **☎ Simulate incoming call**. The Live Intake panel slides in; a resident reports a pothole at Valencia & 21st. Transcript streams in like a live call. |
-| 1:05–1:25 | **AI triage → map pin** | The AI Triage card extracts category / urgency / location / summary (via `codex exec`, scripted fallback), then the camera flies to the Mission as the new red pin drops with a pulse. It also enters the queue at #3 with a LIVE CALL tag. |
+| 1:05–1:25 | **AI triage → map pin** | The AI Triage card extracts category / urgency / location / summary (via DigitalOcean Gradient AI, scripted fallback), then the camera flies to the Mission as the new red pin drops with a pulse. It also enters the queue at #3 with a LIVE CALL tag. |
 | 1:25–1:45 | **Crew match** | The system scans nearby crews and recommends **Marcus Rivera** — closest available street-repair crew, 0.6 km, 2-min ETA — and draws a dispatch line from his truck to the pothole. |
 | 1:45–2:00 | **Acceptance** | On the worker phone, the task card has appeared. Tap **Accept task** — the dashboard line turns green instantly, the queue item flips to CREW EN ROUTE, and a toast confirms. |
 
@@ -64,7 +64,8 @@ mid-demo resumes cleanly.
 
 - **No network needed** beyond basemap tiles (CARTO). Buildings, 311 data, workers, and the
   call are all local.
-- The AI extraction runs `codex exec` in a background thread with a 60s timeout; if codex is
-  missing/slow/wrong, the scripted fields are used and the demo doesn't stall or change shape.
+- The AI extraction calls DigitalOcean Gradient AI in a background thread (kicked off the
+  moment the call starts); if the key is missing or the model is slow/wrong, the scripted
+  fields are used and the demo doesn't stall or change shape.
 - The 3D city model is a slimmed 40 MB GeoJSON (145k footprints, Douglas-Peucker simplified);
   it loads once behind the boot screen in a few seconds.

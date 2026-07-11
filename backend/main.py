@@ -48,7 +48,7 @@ async def _ingest_and_label(limit: int = 50) -> int:
     cases = await ingest.fetch_recent(limit=limit)
     labeled = []
     for case in cases:
-        # Labeler is sync (Anthropic client); offload so we don't block the loop.
+        # Labeler is sync (OpenAI-compatible DO client); offload so we don't block the loop.
         label = await asyncio.to_thread(label_case, case)
         labeled.append(apply_label(case, label))
     store.upsert_many(labeled)

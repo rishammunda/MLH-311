@@ -17,9 +17,9 @@ site, PostgreSQL binding, health check, and `/api` routing in one app.
 
    The same spec can be imported through **Apps → Create App → App Spec** in the
    DigitalOcean control panel.
-3. In the backend component's environment settings, replace
-   `ANTHROPIC_API_KEY` with the real value and keep it encrypted. `SF_APP_TOKEN`
-   is optional.
+3. In the backend component's environment settings, set
+   `DIGITALOCEAN_INFERENCE_KEY` (a Gradient AI model access key) to the real value
+   and keep it encrypted. `DO_MODEL` and `SF_APP_TOKEN` are optional.
 4. Leave `ENABLE_SIMULATE_SURGE=0` in production. Set it to `1` only for a
    controlled demo, then redeploy.
 5. After deployment, verify these URLs using the assigned app hostname:

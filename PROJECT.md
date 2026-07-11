@@ -65,7 +65,8 @@ We take the existing SF311 experience and make it *efficient in real time*:
                                                         │ new cases
                                                         ▼
                                             ┌──────────────────────┐
-                                            │  AI Labeler (Claude) │
+                                            │  AI Labeler (DO      │
+                                            │  Gradient AI)        │
                                             │  category, urgency,  │
                                             │  summary, priority   │
                                             └──────────┬───────────┘
@@ -95,8 +96,9 @@ The public UI only *reads*. This is our SQL-injection answer and keeps the attac
 ## 6. Tech Stack
 
 - **Backend:** Python + **FastAPI** (async, easy SSE for live updates).
-- **AI Labeling:** Anthropic Claude (`claude-haiku-4-5` for cheap/fast labeling, structured
-  JSON output). Batched to control cost.
+- **AI Labeling:** DigitalOcean Gradient AI serverless inference (OpenAI-compatible, default
+  model `openai-gpt-oss-20b`). Prompt-and-parse JSON, validated against a strict schema.
+  Powers both the live case labeler and the demo call-extraction step.
 - **Datastore:** Postgres (managed on DO) — or in-memory/SQLite for the demo fallback.
 - **Frontend:** React + Vite + a map library (Leaflet + OpenStreetMap tiles, no API key
   needed). Ranked queue table alongside the map.

@@ -1,12 +1,55 @@
-import { useMemo, useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
 import { mockCases } from './mockCases';
 
+function MapController({ selectedCaseId, markerRefs }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!selectedCaseId) {
+      return;
+    }
+
+    const selectedCase = mockCases.find((item) => item.id === selectedCaseId);
+    const marker = markerRefs.current[selectedCaseId];
+
+    if (!selectedCase || !marker) {
+      return;
+    }
+
+    map.flyTo([selectedCase.latitude, selectedCase.longitude], 15, {
+      animate: true,
+      duration: 0.8,
+    });
+
+    const handleMoveEnd = () => {
+      marker.openPopup();
+    };
+
+    map.once('moveend', handleMoveEnd);
+
+    return () => {
+      map.off('moveend', handleMoveEnd);
+    };
+  }, [map, markerRefs, selectedCaseId]);
+
+  return null;
+}
+
 function App() {
-  const [selectedCase, setSelectedCase] = useState(mockCases[0]);
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
+  const rankedCases = useMemo(
+    () => [...mockCases].sort((a, b) => b.priority_score - a.priority_score),
+    [],
+  );
+  const markerRefs = useRef({});
+
+  const handleSelectCase = (caseId) => {
+    setSelectedCaseId(caseId);
+  };
 
   const markerIcons = useMemo(
     () =>
@@ -42,6 +85,7 @@ function App() {
               scrollWheelZoom
               className="leaflet-map"
             >
+              <MapController selectedCaseId={selectedCaseId} markerRefs={markerRefs} />
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -52,7 +96,10 @@ function App() {
                   key={item.id}
                   position={[item.latitude, item.longitude]}
                   icon={markerIcons[item.id]}
-                  eventHandlers={{ click: () => setSelectedCase(item) }}
+                  ref={(instance) => {
+                    markerRefs.current[item.id] = instance;
+                  }}
+                  eventHandlers={{ click: () => handleSelectCase(item.id) }}
                 >
                   <Popup>
                     <strong>{item.category}</strong>
@@ -63,31 +110,40 @@ function App() {
               ))}
             </MapContainer>
           </div>
-          <div className="case-details">
-            <h3>{selectedCase.category}</h3>
-            <p>
-              <strong>Description:</strong> {selectedCase.description}
-            </p>
-            <p>
-              <strong>Address:</strong> {selectedCase.address}
-            </p>
-            <p>
-              <strong>Status:</strong> {selectedCase.status}
-            </p>
-            <p>
-              <strong>Priority Score:</strong> {selectedCase.priority_score}
-            </p>
-          </div>
         </section>
 
         <aside className="queue-panel" aria-label="Priority queue panel">
           <div className="panel-heading">
             <h2>Priority Queue</h2>
           </div>
-          <div className="queue-list">
-            <div className="queue-item">Pending inspection</div>
-            <div className="queue-item">Resource review</div>
-            <div className="queue-item">Escalation backlog</div>
+          <div className="queue-list" role="list">
+            {rankedCases.map((item, index) => {
+              const isSelected = selectedCaseId === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`queue-item ${isSelected ? 'queue-item-selected' : ''}`}
+                  onClick={() => handleSelectCase(item.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleSelectCase(item.id);
+                    }
+                  }}
+                  aria-pressed={isSelected}
+                >
+                  <span className="queue-rank">#{index + 1}</span>
+                  <span className="queue-content">
+                    <strong>{item.category}</strong>
+                    <span>{item.address}</span>
+                    <span>Score: {item.priority_score}</span>
+                  </span>
+                  <span className="queue-indicator" style={{ backgroundColor: item.pin_color }} />
+                </button>
+              );
+            })}
           </div>
         </aside>
       </main>

@@ -38,19 +38,11 @@ const STYLE = {
       tileSize: 256
     }
   },
-  light: { anchor: 'viewport', color: '#bcd2ff', intensity: 0.45, position: [1.3, 210, 40] },
-  sky: {
-    'sky-color': '#04070d',
-    'horizon-color': '#0d1830',
-    'fog-color': '#060a14',
-    'sky-horizon-blend': 0.6,
-    'horizon-fog-blend': 0.7,
-    'fog-ground-blend': 0.75
-  },
+  light: { anchor: 'viewport', color: '#ffe9c4', intensity: 0.5, position: [1.4, 200, 50] },
   layers: [
-    { id: 'bg', type: 'background', paint: { 'background-color': '#05080f' } },
-    { id: 'carto-dark', type: 'raster', source: 'carto-dark', paint: { 'raster-opacity': 0.85, 'raster-saturation': -0.25 } },
-    { id: 'carto-labels', type: 'raster', source: 'carto-labels', paint: { 'raster-opacity': 0.5 } }
+    { id: 'bg', type: 'background', paint: { 'background-color': '#4C4C35' } },
+    { id: 'carto-dark', type: 'raster', source: 'carto-dark', paint: { 'raster-opacity': 0.9, 'raster-saturation': -0.1 } },
+    { id: 'carto-labels', type: 'raster', source: 'carto-labels', paint: { 'raster-opacity': 0.55 } }
   ]
 };
 
@@ -106,8 +98,52 @@ async function loadBuildings() {
 
 const EMPTY_FC = { type: 'FeatureCollection', features: [] };
 let allCases = [];
-let workerMarkers = new Map(); // id -> { marker, el, worker }
+let workersById = new Map();
+let chosenWorkerId = null;
 let demoCaseId = null;
+
+const ISSUE_ICONS = {
+  pothole: { color: '#d85b62', code: 'PT' },
+  streetlight: { color: '#568bd8', code: 'SL' },
+  graffiti: { color: '#8b72c7', code: 'GR' },
+  illegal_dumping: { color: '#c77850', code: 'DP' },
+  water_leak: { color: '#3d91ad', code: 'WT' },
+  encampment: { color: '#4b9b78', code: 'EN' },
+  other: { color: '#718096', code: '311' }
+};
+
+function issueIconMarkup(category, className = 'qitem__issue') {
+  const icon = ISSUE_ICONS[category] || ISSUE_ICONS.other;
+  return `<span class="${className}" style="--issue:${icon.color}" aria-hidden="true">${icon.code}</span>`;
+}
+
+function issueMarkerSvg(category) {
+  const icon = ISSUE_ICONS[category] || ISSUE_ICONS.other;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="72" viewBox="0 0 64 72">
+    <defs><filter id="s" x="-30%" y="-25%" width="160%" height="170%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#02060b" flood-opacity=".55"/></filter></defs>
+    <g filter="url(#s)"><circle cx="32" cy="30" r="24" fill="#111b2a" stroke="#f4f7fb" stroke-width="3"/><circle cx="32" cy="30" r="19" fill="${icon.color}"/><path d="M27 52l5 10 5-10" fill="#f4f7fb"/></g>
+    <text x="32" y="35" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="15" font-weight="700" letter-spacing=".4">${icon.code}</text>
+  </svg>`;
+}
+
+function workerMarkerSvg(label, chosen = false) {
+  const stroke = chosen ? '#50b985' : '#7f96b5';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="72" viewBox="0 0 64 72">
+    <defs><filter id="s" x="-30%" y="-25%" width="160%" height="170%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#02060b" flood-opacity=".6"/></filter></defs>
+    <g filter="url(#s)"><circle cx="32" cy="30" r="24" fill="#101a29" stroke="${stroke}" stroke-width="${chosen ? 5 : 3}"/><path d="M27 52l5 10 5-10" fill="${stroke}"/></g>
+    <text x="32" y="35" text-anchor="middle" fill="#eef3fa" font-family="Arial, sans-serif" font-size="14" font-weight="700">${label}</text>
+  </svg>`;
+}
+
+async function registerIssueIcons() {
+  const images = Object.keys(ISSUE_ICONS).map(async (category) => {
+    const image = new Image();
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(issueMarkerSvg(category))}`;
+    await image.decode();
+    map.addImage(`issue-${category}`, image, { pixelRatio: 2 });
+  });
+  await Promise.all(images);
+}
 
 function casesToFC(cases) {
   return {
@@ -118,6 +154,7 @@ function casesToFC(cases) {
       properties: {
         id: c.id,
         color: PIN_COLORS[c.pin_color] || PIN_COLORS.yellow,
+        category: c.ai_category in ISSUE_ICONS ? c.ai_category : 'other',
         score: c.priority_score,
         demo: c.id === demoCaseId ? 1 : 0
       }
@@ -125,25 +162,25 @@ function casesToFC(cases) {
   };
 }
 
-function addDataLayers(buildingsFC) {
+async function addDataLayers(buildingsFC) {
   map.addSource('buildings', { type: 'geojson', data: buildingsFC });
   map.addLayer({
     id: 'buildings-fill',
     type: 'fill-extrusion',
     source: 'buildings',
     paint: {
-      // Older fabric recedes, newer towers read slightly lighter/bluer.
+      // Exact San Francisco era ramp from the upstream Skyline Project.
       'fill-extrusion-color': [
-        'step', ['coalesce', ['get', 'y'], 1920],
-        '#161e30',
-        1900, '#1a2438',
-        1930, '#1e2a42',
-        1960, '#243352',
-        2000, '#2e4067'
+        'step', ['coalesce', ['get', 'y'], 1900],
+        '#656743',
+        1900, '#FFE270',
+        1930, '#858839',
+        1960, '#DCFF3E',
+        2000, '#DFB836'
       ],
       'fill-extrusion-height': ['*', ['get', 'h'], 0.3048],
       'fill-extrusion-base': 0,
-      'fill-extrusion-opacity': 0.94,
+      'fill-extrusion-opacity': 0.95,
       'fill-extrusion-vertical-gradient': true
     }
   });
@@ -151,27 +188,53 @@ function addDataLayers(buildingsFC) {
   map.addSource('cases', { type: 'geojson', data: EMPTY_FC });
   map.addSource('pulse', { type: 'geojson', data: EMPTY_FC });
   map.addSource('route', { type: 'geojson', data: EMPTY_FC });
+  map.addSource('workers', { type: 'geojson', data: EMPTY_FC });
+
+  await registerIssueIcons();
 
   map.addLayer({
-    id: 'case-glow',
-    type: 'circle',
+    id: 'case-symbols',
+    type: 'symbol',
     source: 'cases',
+    layout: {
+      'icon-image': ['concat', 'issue-', ['get', 'category']],
+      'icon-size': [
+        'interpolate', ['linear'], ['zoom'],
+        10.8, 0.95,
+        12.5, 1.15,
+        14.5, 1.45,
+        16.5, 1.85,
+        18, 2.15
+      ],
+      'icon-anchor': 'bottom',
+      'icon-allow-overlap': false,
+      'icon-ignore-placement': false,
+      'symbol-sort-key': ['-', 110, ['get', 'score']]
+    },
     paint: {
-      'circle-color': ['get', 'color'],
-      'circle-radius': ['interpolate', ['linear'], ['get', 'score'], 20, 7, 100, 16],
-      'circle-blur': 1,
-      'circle-opacity': 0.4
+      'icon-opacity': 0.98,
+      'icon-halo-color': '#ffffff',
+      'icon-halo-width': ['case', ['==', ['get', 'demo'], 1], 2, 0]
     }
   });
   map.addLayer({
-    id: 'case-core',
-    type: 'circle',
-    source: 'cases',
-    paint: {
-      'circle-color': ['get', 'color'],
-      'circle-radius': ['interpolate', ['linear'], ['get', 'score'], 20, 3, 100, 6.5],
-      'circle-stroke-color': 'rgba(255,255,255,0.9)',
-      'circle-stroke-width': ['case', ['==', ['get', 'demo'], 1], 2, 1]
+    id: 'worker-symbols',
+    type: 'symbol',
+    source: 'workers',
+    layout: {
+      'icon-image': ['get', 'icon'],
+      'icon-size': [
+        'interpolate', ['linear'], ['zoom'],
+        10.8, 1,
+        13, 1.25,
+        15, 1.55,
+        18, 2
+      ],
+      'icon-anchor': 'bottom',
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+      'icon-pitch-alignment': 'viewport',
+      'icon-rotation-alignment': 'viewport'
     }
   });
   map.addLayer({
@@ -194,13 +257,13 @@ function addDataLayers(buildingsFC) {
     paint: { 'line-color': ACCENT, 'line-width': 3.5, 'line-opacity': 0.95, 'line-dasharray': [0, 4, 3] }
   });
 
-  map.on('click', 'case-core', (e) => {
+  map.on('click', 'case-symbols', (e) => {
     const id = e.features?.[0]?.properties?.id;
     const c = allCases.find((x) => x.id === id);
     if (c) flashQueueItem(c.id);
   });
-  map.on('mouseenter', 'case-core', () => { map.getCanvas().style.cursor = 'pointer'; });
-  map.on('mouseleave', 'case-core', () => { map.getCanvas().style.cursor = ''; });
+  map.on('mouseenter', 'case-symbols', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'case-symbols', () => { map.getCanvas().style.cursor = ''; });
 }
 
 async function refreshCases() {
@@ -212,42 +275,52 @@ async function refreshCases() {
   renderStats();
 }
 
-// --- Workers (DOM markers) --------------------------------------------------
+// --- Workers (native map symbols; no HTML-overlay parallax) -----------------
+
+function renderWorkersSource() {
+  const source = map.getSource('workers');
+  if (!source) return;
+  source.setData({
+    type: 'FeatureCollection',
+    features: [...workersById.values()].map((worker) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [worker.long, worker.lat] },
+      properties: {
+        id: worker.id,
+        status: worker.status,
+        icon: `crew-${worker.id}${worker.id === chosenWorkerId ? '-chosen' : ''}`
+      }
+    }))
+  });
+}
+
+const workerImagePromises = new Map();
+
+function ensureWorkerImages(worker) {
+  if (workerImagePromises.has(worker.id)) return workerImagePromises.get(worker.id);
+  const promise = Promise.all([false, true].map(async (chosen) => {
+    const name = `crew-${worker.id}${chosen ? '-chosen' : ''}`;
+    const image = new Image();
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(workerMarkerSvg(worker.avatar, chosen))}`;
+    await image.decode();
+    if (!map.hasImage(name)) map.addImage(name, image, { pixelRatio: 2 });
+  }));
+  workerImagePromises.set(worker.id, promise);
+  return promise;
+}
 
 function upsertWorkers(workers) {
-  for (const w of workers) {
-    let entry = workerMarkers.get(w.id);
-    if (!entry) {
-      const el = document.createElement('div');
-      el.className = 'crew';
-      el.innerHTML = `<div class="crew__chip">${w.avatar}</div><div class="crew__dot"></div><div class="crew__tip">${w.name}<span>${w.role}</span></div>`;
-      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([w.long, w.lat]).addTo(map);
-      entry = { marker, el, worker: w };
-      workerMarkers.set(w.id, entry);
-    }
-    entry.worker = w;
-    entry.el.dataset.status = w.status;
-  }
+  for (const worker of workers) workersById.set(worker.id, worker);
+  Promise.all(workers.map(ensureWorkerImages)).then(renderWorkersSource);
   renderStats();
 }
 
 // ---------------------------------------------------------------------------
-// Animations: idle orbit, pulse ring, route reveal + marching dashes
+// Animations: pulse ring, route reveal + marching dashes
 // ---------------------------------------------------------------------------
 
 let userBusyUntil = 0;
-let orbitOn = true;
-for (const ev of ['mousedown', 'touchstart', 'wheel']) {
-  map.on(ev, () => { userBusyUntil = Date.now() + 12000; });
-}
-
-function orbitTick() {
-  if (orbitOn && Date.now() > userBusyUntil && !document.hidden) {
-    map.setBearing(map.getBearing() + 0.012);
-  }
-  requestAnimationFrame(orbitTick);
-}
+for (const ev of ['mousedown', 'touchstart', 'wheel']) map.on(ev, () => { userBusyUntil = Date.now() + 12000; });
 
 let pulseActive = false;
 function startPulse(lngLat, color) {
@@ -345,14 +418,12 @@ function renderStats() {
     allCases.filter((c) => c.pin_color === 'red' && c.duplicate_count >= 3)
       .map((c) => `${c.lat.toFixed(3)},${c.long.toFixed(3)},${c.ai_category}`)
   ).size;
-  const crews = [...workerMarkers.values()].filter((e) => e.worker.status === 'available').length;
+  const crews = [...workersById.values()].filter((worker) => worker.status === 'available').length;
   document.getElementById('stat-open').textContent = open || '—';
   document.getElementById('stat-critical').textContent = String(critical);
   document.getElementById('stat-clusters').textContent = String(clusters);
-  document.getElementById('stat-crews').textContent = workerMarkers.size ? String(crews) : '—';
+  document.getElementById('stat-crews').textContent = workersById.size ? String(crews) : '—';
 }
-
-const DOT_CLASS = { red: 'dot--critical', orange: 'dot--serious', yellow: 'dot--warning' };
 
 function renderQueue() {
   const list = document.getElementById('queue-list');
@@ -363,7 +434,7 @@ function renderQueue() {
       <div class="qitem__rank">${String(i + 1).padStart(2, '0')}</div>
       <div class="qitem__main">
         <div class="qitem__top">
-          <i class="dot ${DOT_CLASS[c.pin_color]}"></i>
+          ${issueIconMarkup(c.ai_category)}
           <span class="qitem__cat">${CATEGORY_LABELS[c.ai_category]}</span>
           ${c.duplicate_count > 1 ? `<span class="qitem__dup">×${c.duplicate_count}</span>` : ''}
           ${c.id === demoCaseId ? (assignedNow ? '<span class="qitem__flag qitem__flag--good">CREW EN ROUTE</span>' : '<span class="qitem__flag">LIVE CALL</span>') : ''}
@@ -499,7 +570,6 @@ function onCaseCreated(state) {
   if (caseOnMap || !state.case) return;
   caseOnMap = true;
   demoCaseId = state.case.id;
-  orbitOn = false;
 
   casecardEl.classList.remove('casecard--hidden');
   document.getElementById('casecard-title').textContent =
@@ -567,20 +637,27 @@ function renderMatch(state) {
       </div>
       <div class="mrow__status" id="match-status">${rec.status === 'accepted' ? '' : 'Awaiting acceptance on worker device…'}</div>`;
 
-    const chosenEntry = workerMarkers.get(rec.worker_id);
-    if (chosenEntry) {
-      chosenEntry.el.classList.add('crew--chosen');
+    const chosenWorker = workersById.get(rec.worker_id);
+    if (chosenWorker) {
+      chosenWorkerId = chosenWorker.id;
+      renderWorkersSource();
       showRoute(
-        [chosenEntry.worker.long, chosenEntry.worker.lat],
+        [chosenWorker.long, chosenWorker.lat],
         [state.case.long, state.case.lat],
         ACCENT
       );
       userBusyUntil = 0;
       const b = new maplibregl.LngLatBounds();
-      b.extend([chosenEntry.worker.long, chosenEntry.worker.lat]);
+      b.extend([chosenWorker.long, chosenWorker.lat]);
       b.extend([state.case.long, state.case.lat]);
-      map.fitBounds(b, { padding: { top: 140, bottom: 90, left: 380, right: 420 }, pitch: 48, bearing: -14, duration: 2400, maxZoom: 15.2 });
-      toast(`Task recommended to ${chosenEntry.worker.name} · ${rec.distance_km} km away`);
+      const compact = map.getContainer().clientWidth < 1100;
+      map.fitBounds(b, {
+        padding: compact
+          ? { top: 100, bottom: 80, left: 110, right: 110 }
+          : { top: 140, bottom: 90, left: 380, right: 420 },
+        pitch: 48, bearing: -14, duration: 2400, maxZoom: 15.2
+      });
+      toast(`Task recommended to ${chosenWorker.name} · ${rec.distance_km} km away`);
     }
     const body = document.getElementById('intake-body');
     setTimeout(() => { body.scrollTop = body.scrollHeight; }, 80);
@@ -624,8 +701,8 @@ function applyState(state) {
       resetIntakeUI();
       clearRoute();
       stopPulse();
-      orbitOn = true;
-      for (const e of workerMarkers.values()) e.el.classList.remove('crew--chosen');
+      chosenWorkerId = null;
+      renderWorkersSource();
       refreshCases();
       map.flyTo({ ...HOME, duration: 2500 });
     }
@@ -686,8 +763,8 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
   resetIntakeUI();
   clearRoute();
   stopPulse();
-  orbitOn = true;
-  for (const e of workerMarkers.values()) e.el.classList.remove('crew--chosen');
+  chosenWorkerId = null;
+  renderWorkersSource();
   await refreshCases();
   map.flyTo({ ...HOME, duration: 2200 });
   lastPhase = 'idle';
@@ -704,14 +781,13 @@ map.on('load', async () => {
   try {
     const buildings = await loadBuildings();
     boot.set('raising the skyline…', 74);
-    addDataLayers(buildings);
+    await addDataLayers(buildings);
     boot.set('loading 311 snapshot…', 84);
     await refreshCases();
     boot.set('checking crew radios…', 94);
     await poll();
     map.once('idle', () => boot.done());
     setTimeout(() => boot.done(), 9000); // never trap the demo on the loader
-    orbitTick();
     setInterval(poll, 1000);
   } catch (err) {
     console.error(err);

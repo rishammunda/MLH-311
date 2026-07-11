@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Literal, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 AICategory = Literal[
     "pothole",
@@ -53,3 +53,14 @@ class Case(BaseModel):
 class CasesResponse(BaseModel):
     count: int
     cases: list[Case]
+
+
+class SurgeRequest(BaseModel):
+    case_id: str
+    count: int = Field(ge=1, le=50)
+
+
+class SurgeResponse(BaseModel):
+    ok: bool
+    new_pin_color: PinColor
+    priority_score: int

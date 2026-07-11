@@ -2,8 +2,7 @@
 # Deploy with: doctl apps create --spec .do/app.yaml
 # (or paste into the DO dashboard: Apps > Create > from this repo)
 #
-# Fill in `repo` with your GitHub slug once pushed (e.g. rishammunda/MLH-311),
-# and set ANTHROPIC_API_KEY as an encrypted secret in the DO dashboard.
+# Set ANTHROPIC_API_KEY as an encrypted secret in the DO dashboard.
 
 name: sf311-live-triage
 region: sfo
@@ -20,8 +19,6 @@ services:
     http_port: 8080
     instance_size_slug: basic-xxs
     instance_count: 1
-    routes:
-      - path: /api
     envs:
       - key: ANTHROPIC_API_KEY
         scope: RUN_TIME
@@ -32,6 +29,14 @@ services:
       - key: SEED_LIMIT
         scope: RUN_TIME
         value: "40"
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${cases-db.DATABASE_URL}
+      - key: ENABLE_SIMULATE_SURGE
+        scope: RUN_TIME
+        value: "0"
+    health_check:
+      http_path: /health
 
 static_sites:
   - name: frontend
@@ -42,11 +47,31 @@ static_sites:
     source_dir: frontend
     build_command: npm install && npm run build
     output_dir: dist
-    routes:
-      - path: /
+    catchall_document: index.html
     envs:
       # Point the frontend at the backend component. With both on one app,
-      # the backend is reachable at /api (see routes above).
+      # the backend is reachable at /api (see ingress below).
       - key: VITE_API_BASE
         scope: BUILD_TIME
         value: "/api"
+
+databases:
+  - name: cases-db
+    engine: PG
+    version: "16"
+    # A deployable demo database. Attach a Managed PostgreSQL cluster for prod;
+    # docs/DEPLOY.md explains the required cluster_name change.
+    production: false
+
+ingress:
+  rules:
+    - match:
+        path:
+          prefix: /api
+      component:
+        name: backend
+    - match:
+        path:
+          prefix: /
+      component:
+        name: frontend

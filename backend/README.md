@@ -25,12 +25,41 @@ Then:
 | `main.py` | FastAPI app, routes, rate limiting, background poller |
 | `ingest.py` | Pulls + normalizes cases from the SF SODA API |
 | `labeler.py` | Claude (`claude-haiku-4-5`) → strict JSON label per case |
-| `store.py` | In-memory store + clustering + priority scoring (swap for Postgres) |
+| `store.py` | SQLite/Postgres persistence through one parameterized store API |
+| `prioritization.py` | Source-independent duplicate clustering + priority scoring |
 | `models.py` | Shared Pydantic models (the frozen case shape) |
+
+## Storage and demo surge
+
+With no `DATABASE_URL`, cases persist to `backend/sf311.db`. Set a PostgreSQL URL
+to use Postgres instead; DigitalOcean injects this automatically in production.
+
+The optional surge helper is hidden unless explicitly enabled:
+
+```bash
+ENABLE_SIMULATE_SURGE=1 uvicorn main:app --reload --port 8000
+curl -X POST http://localhost:8000/simulate/surge \
+  -H 'Content-Type: application/json' \
+  -d '{"case_id":"19283746","count":3}'
+```
+
+## Verification
+
+Run the three focused storage/clustering/scoring tests:
+
+```bash
+cd backend
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+Then manually check `/health`, `/cases`, filters, and (when enabled)
+`/simulate/surge`. DigitalOcean exposes the same API under `/api`.
 
 ## Notes
 
-- **One-way data flow**: the public API only reads from the store. The UI never writes.
+- **Extensible data flow**: ingest and future mock-call sources write the same frozen
+  `Case` model. Worker assignment and notifications can read prioritized cases without
+  changing the clustering function.
 - **Rate limiting**: `/cases` is capped per-IP (SlowAPI) to blunt injection/abuse.
 - **Untrusted input**: report text is passed to the LLM as delimited data, never as
   instructions; the model output is validated against a strict JSON schema.

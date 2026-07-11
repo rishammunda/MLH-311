@@ -3,12 +3,12 @@
 Data flow is one-way: SODA API -> ingest -> AI label -> store -> this API -> client.
 The public UI never writes to the store, which is our SQL-injection answer.
 """
-from __future__ import annotations
-
 import asyncio
 import os
+from datetime import datetime, timezone
+from uuid import uuid4
 
-from fastapi import FastAPI, Query, Request
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -18,7 +18,7 @@ from slowapi.util import get_remote_address
 import ingest
 import store
 from labeler import apply_label, label_case
-from models import CasesResponse
+from models import CasesResponse, SurgeRequest, SurgeResponse
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="SF311 Live Triage")
@@ -28,7 +28,7 @@ app.state.limiter = limiter
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # tighten to the deployed frontend origin in prod
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -77,11 +77,13 @@ async def _startup():
 
 
 @app.get("/health")
+@app.get("/api/health", include_in_schema=False)
 async def health():
     return {"status": "ok", "cases": store.count()}
 
 
 @app.get("/cases", response_model=CasesResponse)
+@app.get("/api/cases", response_model=CasesResponse, include_in_schema=False)
 @limiter.limit("60/minute")
 async def get_cases(
     request: Request,
@@ -93,7 +95,41 @@ async def get_cases(
     return CasesResponse(count=len(cases), cases=cases)
 
 
+@app.post("/simulate/surge", response_model=SurgeResponse)
+@app.post("/api/simulate/surge", response_model=SurgeResponse, include_in_schema=False)
+@limiter.limit("10/minute")
+async def simulate_surge(request: Request, surge: SurgeRequest = Body(...)):
+    """Add demo-only duplicate reports and return the base case's new priority."""
+    if os.getenv("ENABLE_SIMULATE_SURGE") != "1":
+        raise HTTPException(status_code=404, detail="Not found")
+
+    base = store.get_case(surge.case_id)
+    if base is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    duplicates = [
+        base.model_copy(
+            update={
+                "id": f"{base.id}-surge-{uuid4().hex[:12]}",
+                "requested_at": now,
+                "raw_details": f"Simulated duplicate of case {base.id}",
+                "source": "demo/simulate",
+            }
+        )
+        for _ in range(surge.count)
+    ]
+    store.upsert_many(duplicates)
+    updated = store.get_case(base.id)
+    return SurgeResponse(
+        ok=True,
+        new_pin_color=updated.pin_color,
+        priority_score=updated.priority_score,
+    )
+
+
 @app.post("/refresh")
+@app.post("/api/refresh", include_in_schema=False)
 @limiter.limit("6/minute")
 async def refresh(request: Request, limit: int = Query(25, ge=1, le=100)):
     """Manual trigger to pull + label a fresh batch (handy during the demo)."""

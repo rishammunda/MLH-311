@@ -96,6 +96,29 @@ def get_case(case_id: str) -> Case | None:
         return _cases.get(case_id)
 
 
+def simulate_surge(case_id: str, count: int) -> Case | None:
+    """Inject `count` synthetic duplicate reports at an existing case's location.
+
+    Demo helper: clones the target case (same lat/long + category, so it lands in
+    the same cluster) so clustering escalates the pin yellow -> orange -> red live.
+    Returns the updated target case, or None if case_id isn't found.
+    """
+    with _lock:
+        target = _cases.get(case_id)
+        if target is None:
+            return None
+        for i in range(count):
+            dup = target.model_copy(
+                update={
+                    "id": f"{case_id}-surge-{i}",
+                    "raw_details": f"[simulated duplicate report] {target.raw_details or ''}",
+                }
+            )
+            _cases[dup.id] = dup
+        _recompute_clusters()
+        return _cases[case_id]
+
+
 def count() -> int:
     with _lock:
         return len(_cases)

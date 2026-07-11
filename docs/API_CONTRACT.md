@@ -98,17 +98,27 @@ Frontend can start with polling `GET /cases` every ~5s and upgrade to SSE if tim
 
 ---
 
-## `POST /api/simulate/surge` (demo helper, optional)
+## `POST /api/simulate/surge` (demo helper) — ✅ implemented
 
-Injects N duplicate reports at a location to demonstrate red escalation live during the demo.
-Not part of the public product; guard behind a flag / disable in prod.
+Injects N duplicate reports at an existing case's location to demonstrate red escalation
+live during the demo. Not part of the public product.
+
+**Disabled by default.** Set env var `ENABLE_SIMULATE=1` to turn it on (keep it off in
+prod). When disabled it returns `403`.
 
 ```json
 // request
 { "case_id": "19283746", "count": 3 }
 // response
-{ "ok": true, "new_pin_color": "red", "priority_score": 92 }
+{ "ok": true, "new_pin_color": "red", "priority_score": 88, "duplicate_count": 4 }
 ```
+
+- `count` is clamped to 1–20.
+- `403` if `ENABLE_SIMULATE` is not set; `404` if `case_id` isn't in the store.
+- The resulting `priority_score` / `pin_color` depend on the case's urgency + safety risk
+  plus the new duplicate count — a low-urgency case may go red on volume alone (dup ≥ 3).
+- After calling this, re-fetch `GET /api/cases` to see the escalated pin (the frontend's
+  "Simulate surge" button should call this, then refresh).
 
 ---
 

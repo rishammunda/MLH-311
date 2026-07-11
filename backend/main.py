@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from fastapi import APIRouter, FastAPI, Query, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -18,7 +18,7 @@ from slowapi.util import get_remote_address
 import ingest
 import store
 from labeler import apply_label, label_case
-from models import CasesResponse
+from models import CasesResponse, SurgeRequest, SurgeResponse
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="SF311 Live Triage")
@@ -100,6 +100,30 @@ async def refresh(request: Request, limit: int = Query(25, ge=1, le=100)):
     """Manual trigger to pull + label a fresh batch (handy during the demo)."""
     added = await _ingest_and_label(limit=limit)
     return {"ok": True, "added": added, "total": store.count()}
+
+
+@api.post("/simulate/surge", response_model=SurgeResponse)
+async def simulate_surge(body: SurgeRequest):
+    """Demo helper: inject duplicate reports at a case to escalate its pin to red.
+
+    Disabled by default. Set ENABLE_SIMULATE=1 to enable (keep it off in prod).
+    No rate-limit decorator here: SlowAPI's wrapper conflicts with resolving a
+    Pydantic body under `from __future__ import annotations`. This endpoint is
+    already gated behind ENABLE_SIMULATE and is demo-only, so the limiter isn't
+    needed.
+    """
+    if os.getenv("ENABLE_SIMULATE") != "1":
+        raise HTTPException(status_code=403, detail="Simulation endpoint disabled.")
+    count = max(1, min(body.count, 20))
+    updated = store.simulate_surge(body.case_id, count)
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"Case {body.case_id} not found.")
+    return SurgeResponse(
+        ok=True,
+        new_pin_color=updated.pin_color,
+        priority_score=updated.priority_score,
+        duplicate_count=updated.duplicate_count,
+    )
 
 
 # Health check is exposed both at the root (for DO's platform health probe) and

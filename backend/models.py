@@ -53,3 +53,16 @@ class Case(BaseModel):
 class CasesResponse(BaseModel):
     count: int
     cases: list[Case]
+
+
+class SurgeRequest(BaseModel):
+    """Demo helper: inject `count` duplicate reports at an existing case."""
+    case_id: str
+    count: int = 3
+
+
+class SurgeResponse(BaseModel):
+    ok: bool
+    new_pin_color: PinColor
+    priority_score: int
+    duplicate_count: int

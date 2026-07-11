@@ -11,7 +11,7 @@ region: sfo
 services:
   - name: backend
     github:
-      repo: rishammunda/MLH-311
+      repo: shaazsaleem/MLH-311
       branch: main
       deploy_on_push: true
     source_dir: backend
@@ -44,7 +44,7 @@ services:
 static_sites:
   - name: frontend
     github:
-      repo: rishammunda/MLH-311
+      repo: shaazsaleem/MLH-311
       branch: main
       deploy_on_push: true
     source_dir: frontend

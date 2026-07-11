@@ -60,14 +60,41 @@ body {
   font-size: 1.15rem;
 }
 
-.placeholder-map {
+.map-wrapper {
   min-height: 420px;
-  border: 1px dashed #3d5878;
   border-radius: 12px;
-  display: grid;
-  place-items: center;
-  color: #8ea2bf;
+  overflow: hidden;
+  border: 1px solid #3d5878;
   background: rgba(255, 255, 255, 0.03);
+}
+
+.leaflet-map {
+  width: 100%;
+  height: 420px;
+}
+
+.custom-div-icon div {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
+}
+
+.case-details {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #dce8ff;
+}
+
+.case-details h3 {
+  margin: 0 0 8px;
+}
+
+.case-details p {
+  margin: 6px 0;
 }
 
 .queue-list {

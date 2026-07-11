@@ -18,6 +18,17 @@ Then:
 - Cases: http://localhost:8000/cases
 - Interactive docs: http://localhost:8000/docs
 
+## Tests
+
+```bash
+cd backend && source .venv/bin/activate
+pytest -q
+```
+
+No network or `ANTHROPIC_API_KEY` needed — the SODA fetch and Claude labeler are
+mocked. Covers dedupe, retry/backoff, concurrent labeling, store clustering/scoring,
+surge, and the API endpoints.
+
 ## Layout
 
 | File | What |

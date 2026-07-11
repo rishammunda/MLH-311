@@ -96,6 +96,17 @@ def get_case(case_id: str) -> Case | None:
         return _cases.get(case_id)
 
 
+def has_case(case_id: str) -> bool:
+    with _lock:
+        return case_id in _cases
+
+
+def known_ids() -> set[str]:
+    """Snapshot of all stored case IDs (for deduping an incoming batch)."""
+    with _lock:
+        return set(_cases.keys())
+
+
 def simulate_surge(case_id: str, count: int) -> Case | None:
     """Inject `count` synthetic duplicate reports at an existing case's location.
 

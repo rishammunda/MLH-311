@@ -41,15 +41,44 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 
+# Bound how many cases we label concurrently so a big batch doesn't fire dozens
+# of Anthropic API calls at once.
+_LABEL_CONCURRENCY = int(os.getenv("LABEL_CONCURRENCY", "5"))
+
+
 async def _ingest_and_label(limit: int = 50) -> int:
-    """Pull recent cases, AI-label them, store them. Returns count added."""
+    """Pull recent cases, dedupe, AI-label the new ones concurrently, store them.
+
+    Returns the number of NEW cases added (already-seen IDs are skipped so we
+    don't re-spend tokens re-labeling cases we already have).
+    """
     cases = await ingest.fetch_recent(limit=limit)
-    labeled = []
+
+    # Dedupe: drop cases already in the store, and any duplicate IDs within this
+    # same batch (the SODA feed can repeat an id across overlapping pulls).
+    seen = store.known_ids()
+    new_cases: list = []
+    batch_ids: set[str] = set()
     for case in cases:
-        # Labeler is sync (Anthropic client); offload so we don't block the loop.
-        label = await asyncio.to_thread(label_case, case)
-        labeled.append(apply_label(case, label))
-    store.upsert_many(labeled)
+        if case.id in seen or case.id in batch_ids:
+            continue
+        batch_ids.add(case.id)
+        new_cases.append(case)
+
+    if not new_cases:
+        return 0
+
+    # Label the new cases concurrently, bounded by a semaphore. The labeler is a
+    # sync (blocking) call, so each runs in a thread.
+    sem = asyncio.Semaphore(_LABEL_CONCURRENCY)
+
+    async def _label(case):
+        async with sem:
+            label = await asyncio.to_thread(label_case, case)
+            return apply_label(case, label)
+
+    labeled = await asyncio.gather(*(_label(c) for c in new_cases))
+    store.upsert_many(list(labeled))
     return len(labeled)
 
 

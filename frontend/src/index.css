@@ -1,0 +1,93 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #07111f;
+  color: #f4f7fb;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #07111f 0%, #13223a 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 24px;
+  background: transparent;
+}
+
+.app-header {
+  padding: 20px 24px;
+  border-radius: 16px;
+  background: rgba(13, 24, 38, 0.95);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  margin-bottom: 20px;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+}
+
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+.map-panel,
+.queue-panel {
+  background: rgba(13, 24, 38, 0.95);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+.panel-heading h2 {
+  margin: 0 0 16px;
+  font-size: 1.15rem;
+}
+
+.placeholder-map {
+  min-height: 420px;
+  border: 1px dashed #3d5878;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #8ea2bf;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.queue-list {
+  display: grid;
+  gap: 12px;
+}
+
+.queue-item {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #14253d;
+  color: #dce8ff;
+}
+
+@media (max-width: 800px) {
+  .app-shell {
+    padding: 16px;
+  }
+
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+}

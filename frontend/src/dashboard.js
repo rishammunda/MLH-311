@@ -146,7 +146,9 @@ function casesToFC(cases) {
 }
 
 async function addDataLayers(buildingsFC) {
-  map.addSource('buildings', { type: 'geojson', data: buildingsFC });
+  // Generated ids let MapLibre keep hover/selection state without bloating the
+  // 38 MB source file with another property on every footprint.
+  map.addSource('buildings', { type: 'geojson', data: buildingsFC, generateId: true });
   map.addLayer({
     id: 'buildings-fill',
     type: 'fill-extrusion',
@@ -154,12 +156,17 @@ async function addDataLayers(buildingsFC) {
     paint: {
       // Exact San Francisco era ramp from the upstream Skyline Project.
       'fill-extrusion-color': [
-        'step', ['coalesce', ['get', 'y'], 1900],
-        '#656743',
-        1900, '#FFE270',
-        1930, '#858839',
-        1960, '#DCFF3E',
-        2000, '#DFB836'
+        'case',
+        ['boolean', ['feature-state', 'selected'], false], '#8fc4ff',
+        ['boolean', ['feature-state', 'hover'], false], '#f1f7c2',
+        [
+          'step', ['coalesce', ['get', 'y'], 1900],
+          '#656743',
+          1900, '#FFE270',
+          1930, '#858839',
+          1960, '#DCFF3E',
+          2000, '#DFB836'
+        ]
       ],
       'fill-extrusion-height': ['*', ['get', 'h'], 0.3048],
       'fill-extrusion-base': 0,
@@ -247,7 +254,109 @@ async function addDataLayers(buildingsFC) {
   });
   map.on('mouseenter', 'case-symbols', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'case-symbols', () => { map.getCanvas().style.cursor = ''; });
+
+  // Keep case pins as the top click target, then inspect the building beneath
+  // every other map click. The small-radius fallback makes narrow footprints
+  // usable without turning roads and parks into false positives.
+  map.on('click', (e) => {
+    if (map.queryRenderedFeatures(e.point, { layers: ['case-symbols'] }).length) return;
+    let hit = map.queryRenderedFeatures(e.point, { layers: ['buildings-fill'] })[0];
+    if (!hit) {
+      const p = e.point;
+      hit = map.queryRenderedFeatures(
+        [[p.x - 5, p.y - 5], [p.x + 5, p.y + 5]],
+        { layers: ['buildings-fill'] }
+      )[0];
+    }
+    if (!hit) {
+      closeBuildingPanel();
+      return;
+    }
+    setSelectedBuilding(hit.id);
+    openBuildingPanel(hit.properties, e.lngLat);
+  });
+
+  map.on('mousemove', 'buildings-fill', (e) => {
+    map.getCanvas().style.cursor = 'pointer';
+    setHoveredBuilding(e.features?.[0]?.id ?? null);
+  });
+  map.on('mouseleave', 'buildings-fill', () => {
+    map.getCanvas().style.cursor = '';
+    setHoveredBuilding(null);
+  });
 }
+
+// ---------------------------------------------------------------------------
+// Building inspector — adapted to the compact SF311 operations UI
+// ---------------------------------------------------------------------------
+
+const buildingPanelEl = document.getElementById('building-panel');
+let selectedBuildingId = null;
+let hoveredBuildingId = null;
+
+function setSelectedBuilding(id) {
+  if (selectedBuildingId === id) return;
+  if (selectedBuildingId !== null) {
+    try { map.setFeatureState({ source: 'buildings', id: selectedBuildingId }, { selected: false }); } catch {}
+  }
+  selectedBuildingId = id;
+  if (id !== null) {
+    try { map.setFeatureState({ source: 'buildings', id }, { selected: true }); } catch {}
+  }
+}
+
+function setHoveredBuilding(id) {
+  if (hoveredBuildingId === id) return;
+  if (hoveredBuildingId !== null) {
+    try { map.setFeatureState({ source: 'buildings', id: hoveredBuildingId }, { hover: false }); } catch {}
+  }
+  hoveredBuildingId = id;
+  if (id !== null) {
+    try { map.setFeatureState({ source: 'buildings', id }, { hover: true }); } catch {}
+  }
+}
+
+function buildingEra(year) {
+  if (!year) return { label: 'Year unknown', color: '#7f8460' };
+  if (year < 1900) return { label: 'Pre-1900', color: '#656743' };
+  if (year < 1930) return { label: 'Early 20th century', color: '#FFE270' };
+  if (year < 1960) return { label: '1930–1959', color: '#858839' };
+  if (year < 2000) return { label: '1960–1999', color: '#DCFF3E' };
+  return { label: 'Contemporary', color: '#DFB836' };
+}
+
+function openBuildingPanel(properties = {}, lngLat) {
+  const yearValue = Number(properties.y);
+  const year = Number.isFinite(yearValue) && yearValue > 1700 ? Math.round(yearValue) : null;
+  const heightValue = Number(properties.h);
+  const heightFt = Number.isFinite(heightValue) && heightValue > 0 ? heightValue : null;
+  const era = buildingEra(year);
+  const nearby = allCases.filter((c) =>
+    haversineKm(lngLat.lat, lngLat.lng, c.lat, c.long) <= 0.15
+  ).length;
+
+  document.getElementById('building-title').textContent = year ? `${era.label} building` : 'Building footprint';
+  document.getElementById('building-era').textContent = era.label;
+  document.getElementById('building-era-swatch').style.background = era.color;
+  document.getElementById('building-year').textContent = year ? String(year) : 'Not recorded';
+  document.getElementById('building-height').textContent = heightFt
+    ? `${Math.round(heightFt)} ft · ${Math.round(heightFt * 0.3048)} m`
+    : 'Not recorded';
+  document.getElementById('building-floors').textContent = heightFt
+    ? `≈ ${Math.max(1, Math.round(heightFt / 11))}`
+    : 'Not available';
+  document.getElementById('building-location').textContent =
+    `${lngLat.lat.toFixed(5)}, ${lngLat.lng.toFixed(5)}`;
+  document.getElementById('building-nearby-count').textContent = String(nearby);
+  buildingPanelEl.classList.remove('building-panel--hidden');
+}
+
+function closeBuildingPanel() {
+  buildingPanelEl.classList.add('building-panel--hidden');
+  setSelectedBuilding(null);
+}
+
+document.getElementById('building-panel-close').addEventListener('click', closeBuildingPanel);
 
 async function refreshCases() {
   const data = await fetchCases(500);
@@ -738,6 +847,7 @@ setInterval(() => {
 }, 1000);
 
 document.getElementById('btn-call').addEventListener('click', async () => {
+  closeBuildingPanel();
   await startCall();
   poll();
 });

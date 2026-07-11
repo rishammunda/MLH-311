@@ -57,6 +57,37 @@
       </div>
     </aside>
 
+    <!-- Right: click-to-inspect building details (hidden until a building is selected) -->
+    <aside class="building-panel building-panel--hidden" id="building-panel" aria-live="polite" aria-label="Selected building details">
+      <div class="building-panel__head">
+        <div>
+          <div class="building-panel__eyebrow">Selected building</div>
+          <div class="building-panel__title" id="building-title">Building footprint</div>
+        </div>
+        <button class="building-panel__close" id="building-panel-close" type="button" aria-label="Close building details">×</button>
+      </div>
+      <div class="building-panel__body">
+        <div class="building-panel__era">
+          <span class="building-panel__swatch" id="building-era-swatch" aria-hidden="true"></span>
+          <div>
+            <div class="building-panel__era-label" id="building-era">Year unknown</div>
+            <div class="building-panel__era-note">San Francisco building record</div>
+          </div>
+        </div>
+        <dl class="building-panel__facts">
+          <div><dt>Built</dt><dd id="building-year">—</dd></div>
+          <div><dt>Height</dt><dd id="building-height">—</dd></div>
+          <div><dt>Est. floors</dt><dd id="building-floors">—</dd></div>
+          <div><dt>Location</dt><dd id="building-location">—</dd></div>
+        </dl>
+        <div class="building-panel__nearby">
+          <span class="building-panel__nearby-count" id="building-nearby-count">0</span>
+          <span>open 311 requests within 150 m</span>
+        </div>
+        <p class="building-panel__note">Height and construction year come from the city building dataset. Floor count is an estimate.</p>
+      </div>
+    </aside>
+
     <!-- Right: live intake panel (hidden until a call starts) -->
     <aside class="intake intake--hidden" id="intake">
       <div class="intake__head">

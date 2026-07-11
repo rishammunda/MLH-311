@@ -15,17 +15,12 @@ Two options. The App Platform path is the fastest for a hackathon.
 5. Deploy. DO gives you a public URL like
    `https://sf311-live-triage-xxxxx.ondigitalocean.app`.
 
-### One routing gotcha
+### Routing
 
-`.do/app.yaml` puts the backend under `/api`, but the FastAPI routes are `/cases`,
-`/health`, etc. Pick one:
-
-- **Simplest:** change the backend route in `app.yaml` from `/api` to `/` and give the
-  frontend its own component/app, OR
-- Add an APIRouter prefix in `backend/main.py` (`APIRouter(prefix="/api")`) so routes
-  become `/api/cases` and match the `/api` route.
-
-Set the frontend's `VITE_API_BASE` to match whatever the backend is reachable at.
+The FastAPI data routes are served under an `/api` prefix (`/api/cases`, `/api/health`,
+`/api/refresh`), which matches the backend route in `.do/app.yaml`. `/health` is also
+exposed at the root for DO's platform health probe. The frontend's `VITE_API_BASE` is
+set to `/api` in `app.yaml`, so it calls `${VITE_API_BASE}/cases`.
 
 ## Option B — Single Droplet + Docker Compose
 

@@ -6,21 +6,26 @@ sides can work in parallel. If it must change, ping the team first.
 Base URL (local): `http://localhost:8000`
 Base URL (prod): set by DO deploy, e.g. `https://sf311-triage-xxxxx.ondigitalocean.app`
 
+**All data routes are under an `/api` prefix** (so they match the DigitalOcean route).
+So the endpoints below are `GET /api/cases`, `GET /api/health`, etc. `GET /health` also
+exists at the root for the platform health probe. On the frontend, set
+`VITE_API_BASE` to the base + `/api` and call `${VITE_API_BASE}/cases`.
+
 All responses are JSON. The public API is **read-only** (server → client only).
 
 ---
 
-## `GET /health`
+## `GET /api/health` (also `GET /health`)
 
 Liveness check.
 
 ```json
-{ "status": "ok" }
+{ "status": "ok", "cases": 0 }
 ```
 
 ---
 
-## `GET /cases`
+## `GET /api/cases`
 
 Returns the current set of labeled cases, already prioritized.
 
@@ -78,7 +83,7 @@ Returns the current set of labeled cases, already prioritized.
 
 ---
 
-## `GET /stream` (stretch — SSE)
+## `GET /api/stream` (stretch — SSE)
 
 Server-Sent Events stream that pushes new/updated cases as they're labeled, so the map
 updates without a refresh. Each event `data:` is a single case object (same shape as an entry
@@ -93,7 +98,7 @@ Frontend can start with polling `GET /cases` every ~5s and upgrade to SSE if tim
 
 ---
 
-## `POST /simulate/surge` (demo helper, optional)
+## `POST /api/simulate/surge` (demo helper, optional)
 
 Injects N duplicate reports at a location to demonstrate red escalation live during the demo.
 Not part of the public product; guard behind a flag / disable in prod.

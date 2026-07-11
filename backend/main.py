@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from fastapi import FastAPI, Query, Request
+from fastapi import APIRouter, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -76,12 +76,13 @@ async def _startup():
         asyncio.create_task(_poll())
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "cases": store.count()}
+# All data routes live under /api so they match the DigitalOcean App Platform
+# route (.do/app.yaml routes the backend component at /api). The frontend's
+# VITE_API_BASE points at this same prefix.
+api = APIRouter(prefix="/api")
 
 
-@app.get("/cases", response_model=CasesResponse)
+@api.get("/cases", response_model=CasesResponse)
 @limiter.limit("60/minute")
 async def get_cases(
     request: Request,
@@ -93,9 +94,20 @@ async def get_cases(
     return CasesResponse(count=len(cases), cases=cases)
 
 
-@app.post("/refresh")
+@api.post("/refresh")
 @limiter.limit("6/minute")
 async def refresh(request: Request, limit: int = Query(25, ge=1, le=100)):
     """Manual trigger to pull + label a fresh batch (handy during the demo)."""
     added = await _ingest_and_label(limit=limit)
     return {"ok": True, "added": added, "total": store.count()}
+
+
+# Health check is exposed both at the root (for DO's platform health probe) and
+# under /api (for consistency with the rest of the API).
+@app.get("/health")
+@api.get("/health")
+async def health():
+    return {"status": "ok", "cases": store.count()}
+
+
+app.include_router(api)

@@ -1,0 +1,38 @@
+# Backend — SF311 Live Triage API
+
+FastAPI service that ingests live SF 311 cases, AI-labels them with Claude, and
+serves them via a rate-limited, read-only API. See [../docs/API_CONTRACT.md](../docs/API_CONTRACT.md).
+
+## Run locally
+
+```bash
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env    # then add your ANTHROPIC_API_KEY
+uvicorn main:app --reload --port 8000
+```
+
+Then:
+- Health: http://localhost:8000/health
+- Cases: http://localhost:8000/cases
+- Interactive docs: http://localhost:8000/docs
+
+## Layout
+
+| File | What |
+| --- | --- |
+| `main.py` | FastAPI app, routes, rate limiting, background poller |
+| `ingest.py` | Pulls + normalizes cases from the SF SODA API |
+| `labeler.py` | Claude (`claude-haiku-4-5`) → strict JSON label per case |
+| `store.py` | In-memory store + clustering + priority scoring (swap for Postgres) |
+| `models.py` | Shared Pydantic models (the frozen case shape) |
+
+## Notes
+
+- **One-way data flow**: the public API only reads from the store. The UI never writes.
+- **Rate limiting**: `/cases` is capped per-IP (SlowAPI) to blunt injection/abuse.
+- **Untrusted input**: report text is passed to the LLM as delimited data, never as
+  instructions; the model output is validated against a strict JSON schema.
+- **Demo resilience**: if the Anthropic API is unavailable, `labeler.py` falls back to a
+  safe default label so a case is never dropped.

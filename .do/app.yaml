@@ -1,0 +1,52 @@
+# DigitalOcean App Platform spec.
+# Deploy with: doctl apps create --spec .do/app.yaml
+# (or paste into the DO dashboard: Apps > Create > from this repo)
+#
+# Fill in `repo` with your GitHub slug once pushed (e.g. rishammunda/MLH-311),
+# and set ANTHROPIC_API_KEY as an encrypted secret in the DO dashboard.
+
+name: sf311-live-triage
+region: sfo
+
+services:
+  - name: backend
+    github:
+      repo: rishammunda/MLH-311
+      branch: main
+      deploy_on_push: true
+    source_dir: backend
+    environment_slug: python
+    run_command: uvicorn main:app --host 0.0.0.0 --port 8080
+    http_port: 8080
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    routes:
+      - path: /api
+    envs:
+      - key: ANTHROPIC_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: SF_APP_TOKEN
+        scope: RUN_TIME
+        value: ""
+      - key: SEED_LIMIT
+        scope: RUN_TIME
+        value: "40"
+
+static_sites:
+  - name: frontend
+    github:
+      repo: rishammunda/MLH-311
+      branch: main
+      deploy_on_push: true
+    source_dir: frontend
+    build_command: npm install && npm run build
+    output_dir: dist
+    routes:
+      - path: /
+    envs:
+      # Point the frontend at the backend component. With both on one app,
+      # the backend is reachable at /api (see routes above).
+      - key: VITE_API_BASE
+        scope: BUILD_TIME
+        value: "/api"

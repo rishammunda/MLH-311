@@ -34,14 +34,26 @@
     <!-- Left: ranked priority queue -->
     <aside class="queue" id="queue">
       <div class="queue__head">
-        <div class="queue__title">Case queue</div>
-        <div class="queue__hint"><span id="queue-total">0</span> open · priority order</div>
+        <div class="queue__title">Priority queue</div>
+        <div class="queue__hint"><span id="queue-total">0</span> open · auto-ranked</div>
       </div>
       <div class="queue__list" id="queue-list"></div>
       <div class="queue__legend">
-        <span><i class="dot dot--critical"></i>Critical</span>
-        <span><i class="dot dot--serious"></i>Elevated</span>
-        <span><i class="dot dot--warning"></i>Routine</span>
+        <div class="queue__legend-row">
+          <span class="legend__shape">
+            <svg viewBox="0 0 24 28" width="10" height="12" aria-hidden="true"><path fill="#9db1cf" d="M12 1C6 1 1.5 5.7 1.5 11.5c0 6.6 8 14.2 9.6 15.7.5.5 1.3.5 1.8 0 1.6-1.5 9.6-9.1 9.6-15.7C22.5 5.7 18 1 12 1z"/></svg>
+            Reported case
+          </span>
+          <span class="legend__shape">
+            <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><rect fill="#9db1cf" x="2" y="2" width="20" height="20" rx="7"/></svg>
+            Field crew
+          </span>
+        </div>
+        <div class="queue__legend-row">
+          <span><i class="dot dot--critical"></i>Critical</span>
+          <span><i class="dot dot--serious"></i>Elevated</span>
+          <span><i class="dot dot--warning"></i>Routine</span>
+        </div>
       </div>
     </aside>
 
@@ -57,7 +69,7 @@
       <div class="intake__body" id="intake-body">
         <div class="transcript" id="transcript"></div>
         <div class="triage triage--hidden" id="triage">
-          <div class="triage__head">AI triage <span class="triage__engine">· model extraction</span></div>
+          <div class="triage__head">Automated triage <span class="triage__engine">· extracted from call</span></div>
           <div class="triage__grid">
             <div class="triage__row" data-field="category"><span class="triage__k">Category</span><span class="triage__v" id="tri-category"></span></div>
             <div class="triage__row" data-field="urgency"><span class="triage__k">Urgency</span><span class="triage__v" id="tri-urgency"></span></div>
@@ -80,7 +92,8 @@
     <!-- Bottom-right demo controls -->
     <div class="controls">
       <button class="btn btn--primary" id="btn-call">
-        <span class="btn__icon">☎</span> Simulate incoming call
+        <svg class="btn__icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        Simulate incoming call
       </button>
       <button class="btn btn--ghost" id="btn-reset" title="Reset demo">Reset</button>
     </div>

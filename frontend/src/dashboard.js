@@ -5,6 +5,7 @@ import {
   fetchCases, fetchDemoState, startCall, resetDemo,
   CATEGORY_LABELS, PIN_COLORS, GOOD, ACCENT, timeAgo
 } from './api.js';
+import { CATEGORY_COLORS, glyphSvg, casePinSvg, crewBadgeSvg } from './icons.js';
 
 // ---------------------------------------------------------------------------
 // Map bootstrap — 3D skyline foundation adapted from "The Skyline Project"
@@ -56,6 +57,7 @@ const map = new maplibregl.Map({
   antialias: true
 });
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: false, showCompass: false }), 'bottom-right');
+window.__map = map;
 
 const boot = {
   el: document.getElementById('boot'),
@@ -102,47 +104,28 @@ let workersById = new Map();
 let chosenWorkerId = null;
 let demoCaseId = null;
 
-const ISSUE_ICONS = {
-  pothole: { color: '#d85b62', code: 'PT' },
-  streetlight: { color: '#568bd8', code: 'SL' },
-  graffiti: { color: '#8b72c7', code: 'GR' },
-  illegal_dumping: { color: '#c77850', code: 'DP' },
-  water_leak: { color: '#3d91ad', code: 'WT' },
-  encampment: { color: '#4b9b78', code: 'EN' },
-  other: { color: '#718096', code: '311' }
-};
-
 function issueIconMarkup(category, className = 'qitem__issue') {
-  const icon = ISSUE_ICONS[category] || ISSUE_ICONS.other;
-  return `<span class="${className}" style="--issue:${icon.color}" aria-hidden="true">${icon.code}</span>`;
+  const color = CATEGORY_COLORS[category] || CATEGORY_COLORS.other;
+  return `<span class="${className}" style="--issue:${color}" aria-hidden="true">${glyphSvg(category)}</span>`;
 }
 
-function issueMarkerSvg(category) {
-  const icon = ISSUE_ICONS[category] || ISSUE_ICONS.other;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="72" viewBox="0 0 64 72">
-    <defs><filter id="s" x="-30%" y="-25%" width="160%" height="170%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#02060b" flood-opacity=".55"/></filter></defs>
-    <g filter="url(#s)"><circle cx="32" cy="30" r="24" fill="#111b2a" stroke="#f4f7fb" stroke-width="3"/><circle cx="32" cy="30" r="19" fill="${icon.color}"/><path d="M27 52l5 10 5-10" fill="#f4f7fb"/></g>
-    <text x="32" y="35" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="15" font-weight="700" letter-spacing=".4">${icon.code}</text>
-  </svg>`;
+async function svgToImage(svg) {
+  const image = new Image();
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  await image.decode();
+  return image;
 }
 
-function workerMarkerSvg(label, chosen = false) {
-  const stroke = chosen ? '#50b985' : '#7f96b5';
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="72" viewBox="0 0 64 72">
-    <defs><filter id="s" x="-30%" y="-25%" width="160%" height="170%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#02060b" flood-opacity=".6"/></filter></defs>
-    <g filter="url(#s)"><circle cx="32" cy="30" r="24" fill="#101a29" stroke="${stroke}" stroke-width="${chosen ? 5 : 3}"/><path d="M27 52l5 10 5-10" fill="${stroke}"/></g>
-    <text x="32" y="35" text-anchor="middle" fill="#eef3fa" font-family="Arial, sans-serif" font-size="14" font-weight="700">${label}</text>
-  </svg>`;
-}
-
-async function registerIssueIcons() {
-  const images = Object.keys(ISSUE_ICONS).map(async (category) => {
-    const image = new Image();
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(issueMarkerSvg(category))}`;
-    await image.decode();
-    map.addImage(`issue-${category}`, image, { pixelRatio: 2 });
-  });
-  await Promise.all(images);
+async function registerMarkerImages() {
+  const entries = [
+    ...Object.keys(CATEGORY_COLORS).map((c) => [`issue-${c}`, casePinSvg(c)]),
+    ['crew-available', crewBadgeSvg()],
+    ['crew-busy', crewBadgeSvg({ busy: true })],
+    ['crew-chosen', crewBadgeSvg({ chosen: true })]
+  ];
+  await Promise.all(entries.map(async ([name, svg]) => {
+    map.addImage(name, await svgToImage(svg), { pixelRatio: 2 });
+  }));
 }
 
 function casesToFC(cases) {
@@ -154,7 +137,7 @@ function casesToFC(cases) {
       properties: {
         id: c.id,
         color: PIN_COLORS[c.pin_color] || PIN_COLORS.yellow,
-        category: c.ai_category in ISSUE_ICONS ? c.ai_category : 'other',
+        category: c.ai_category in CATEGORY_COLORS ? c.ai_category : 'other',
         score: c.priority_score,
         demo: c.id === demoCaseId ? 1 : 0
       }
@@ -190,7 +173,7 @@ async function addDataLayers(buildingsFC) {
   map.addSource('route', { type: 'geojson', data: EMPTY_FC });
   map.addSource('workers', { type: 'geojson', data: EMPTY_FC });
 
-  await registerIssueIcons();
+  await registerMarkerImages();
 
   map.addLayer({
     id: 'case-symbols',
@@ -277,6 +260,11 @@ async function refreshCases() {
 
 // --- Workers (native map symbols; no HTML-overlay parallax) -----------------
 
+function workerIconName(worker) {
+  if (worker.id === chosenWorkerId) return 'crew-chosen';
+  return worker.status === 'available' ? 'crew-available' : 'crew-busy';
+}
+
 function renderWorkersSource() {
   const source = map.getSource('workers');
   if (!source) return;
@@ -288,30 +276,15 @@ function renderWorkersSource() {
       properties: {
         id: worker.id,
         status: worker.status,
-        icon: `crew-${worker.id}${worker.id === chosenWorkerId ? '-chosen' : ''}`
+        icon: workerIconName(worker)
       }
     }))
   });
 }
 
-const workerImagePromises = new Map();
-
-function ensureWorkerImages(worker) {
-  if (workerImagePromises.has(worker.id)) return workerImagePromises.get(worker.id);
-  const promise = Promise.all([false, true].map(async (chosen) => {
-    const name = `crew-${worker.id}${chosen ? '-chosen' : ''}`;
-    const image = new Image();
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(workerMarkerSvg(worker.avatar, chosen))}`;
-    await image.decode();
-    if (!map.hasImage(name)) map.addImage(name, image, { pixelRatio: 2 });
-  }));
-  workerImagePromises.set(worker.id, promise);
-  return promise;
-}
-
 function upsertWorkers(workers) {
   for (const worker of workers) workersById.set(worker.id, worker);
-  Promise.all(workers.map(ensureWorkerImages)).then(renderWorkersSource);
+  renderWorkersSource();
   renderStats();
 }
 
@@ -425,24 +398,34 @@ function renderStats() {
   document.getElementById('stat-crews').textContent = workersById.size ? String(crews) : '—';
 }
 
+function shortAddress(c) {
+  if (!c.address) return c.neighborhood || 'San Francisco';
+  return c.address.split(',')[0].toLowerCase()
+    .replace(/\b([a-z])/g, (m, ch) => ch.toUpperCase())
+    .replace(/\b(\d+)(Th|St|Nd|Rd)\b/g, (m, num, suffix) => num + suffix.toLowerCase());
+}
+
 function renderQueue() {
   const list = document.getElementById('queue-list');
   document.getElementById('queue-total').textContent = allCases.length;
-  const top = allCases.slice(0, 12);
-  list.innerHTML = top.map((c, i) => `
-    <div class="qitem ${c.id === demoCaseId ? 'qitem--new' : ''}" data-id="${c.id}" data-lng="${c.long}" data-lat="${c.lat}">
-      <div class="qitem__rank">${String(i + 1).padStart(2, '0')}</div>
+  const top = allCases.slice(0, 60);
+  list.innerHTML = top.map((c) => `
+    <div class="qitem ${c.id === demoCaseId ? 'qitem--new' : ''}" data-id="${c.id}" data-lng="${c.long}" data-lat="${c.lat}" style="--sev:${scoreColor(c)}">
+      ${issueIconMarkup(c.ai_category)}
       <div class="qitem__main">
         <div class="qitem__top">
-          ${issueIconMarkup(c.ai_category)}
-          <span class="qitem__cat">${CATEGORY_LABELS[c.ai_category]}</span>
-          ${c.duplicate_count > 1 ? `<span class="qitem__dup">×${c.duplicate_count}</span>` : ''}
-          ${c.id === demoCaseId ? (assignedNow ? '<span class="qitem__flag qitem__flag--good">CREW EN ROUTE</span>' : '<span class="qitem__flag">LIVE CALL</span>') : ''}
+          <span class="qitem__cat">${CATEGORY_LABELS[c.ai_category] || 'General'}</span>
+          ${c.duplicate_count > 1 ? `<span class="qitem__dup">${c.duplicate_count} reports</span>` : ''}
+          ${c.id === demoCaseId ? (assignedNow ? '<span class="qitem__flag qitem__flag--good">Crew en route</span>' : '<span class="qitem__flag">Live call</span>') : ''}
+          <span class="qitem__time">${timeAgo(c.requested_at)}</span>
         </div>
         <div class="qitem__sum">${escapeHtml(c.ai_summary || c.raw_details || '—')}</div>
-        <div class="qitem__meta">${escapeHtml(c.neighborhood || c.address || 'San Francisco')} · ${timeAgo(c.requested_at)}</div>
+        <div class="qitem__meta">${escapeHtml(shortAddress(c))} · ${escapeHtml(c.neighborhood || 'San Francisco')} · #${escapeHtml(String(c.id).slice(-6))}</div>
       </div>
-      <div class="qitem__score" style="--sc:${scoreColor(c)}">${c.priority_score}</div>
+      <div class="qitem__score">
+        <b>${c.priority_score}</b>
+        <span class="qitem__meter"><i style="width:${Math.min(100, c.priority_score)}%"></i></span>
+      </div>
     </div>`).join('');
 
   for (const el of list.querySelectorAll('.qitem')) {
@@ -609,7 +592,7 @@ function renderMatch(state) {
     .slice(0, 4);
 
   if (!rec) {
-    head.innerHTML = '<span class="scan"></span> Locating nearest qualified crew…';
+    head.innerHTML = '<span class="scan"></span> Locating nearest crew…';
     list.innerHTML = rows.map(({ w, d }) => `
       <div class="mrow mrow--scan" data-id="${w.id}">
         <div class="mrow__avatar">${w.avatar}</div>
@@ -624,7 +607,7 @@ function renderMatch(state) {
     const chosen = state.workers.find((w) => w.id === rec.worker_id);
     head.innerHTML = rec.status === 'accepted'
       ? '✓ Crew assigned'
-      : 'Crew recommended — task sent to device';
+      : 'Crew recommended · task sent';
     list.innerHTML = `
       <div class="mrow mrow--chosen" data-id="${chosen.id}">
         <div class="mrow__avatar mrow__avatar--chosen">${chosen.avatar}</div>

@@ -2,6 +2,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './worker.css';
 import { fetchDemoState, acceptTask, CATEGORY_LABELS, PIN_COLORS } from './api.js';
+import { CATEGORY_COLORS, glyphSvg, casePinSvg, crewBadgeSvg } from './icons.js';
 
 const ME = 'w1'; // Marcus Rivera — the crew the demo recommends
 
@@ -66,12 +67,13 @@ function initMiniMap(state) {
   });
   const pin = document.createElement('div');
   pin.className = 'mini-pin';
-  new maplibregl.Marker({ element: pin }).setLngLat([c.long, c.lat]).addTo(miniMap);
+  pin.innerHTML = casePinSvg(c.ai_category in CATEGORY_COLORS ? c.ai_category : 'other');
+  new maplibregl.Marker({ element: pin, anchor: 'bottom' }).setLngLat([c.long, c.lat]).addTo(miniMap);
   if (me) {
     const meEl = document.createElement('div');
     meEl.className = 'mini-me';
-    meEl.textContent = 'MR';
-    new maplibregl.Marker({ element: meEl }).setLngLat([me.long, me.lat]).addTo(miniMap);
+    meEl.innerHTML = crewBadgeSvg({ chosen: true });
+    new maplibregl.Marker({ element: meEl, anchor: 'bottom' }).setLngLat([me.long, me.lat]).addTo(miniMap);
     // The card animates in; wait until the container has real dimensions
     // before fitting, or the zoom is computed against a 0-height box.
     setTimeout(() => {
@@ -87,7 +89,9 @@ function initMiniMap(state) {
 function renderTask(state) {
   const c = state.case;
   const rec = state.recommendation;
-  els.cat.textContent = (CATEGORY_LABELS[c.ai_category] || c.ai_category).toUpperCase();
+  const category = c.ai_category in CATEGORY_COLORS ? c.ai_category : 'other';
+  els.cat.style.setProperty('--issue', CATEGORY_COLORS[category]);
+  els.cat.innerHTML = `${glyphSvg(category, { size: 12 })}<span>${CATEGORY_LABELS[c.ai_category] || c.ai_category}</span>`;
   els.urg.textContent = c.ai_urgency.toUpperCase();
   els.urg.style.setProperty('--urgc', c.ai_urgency === 'critical' || c.ai_urgency === 'high' ? PIN_COLORS.red : PIN_COLORS.yellow);
   els.score.textContent = `P·${c.priority_score}`;
@@ -96,7 +100,7 @@ function renderTask(state) {
   els.sum.textContent = c.ai_summary;
   els.dist.textContent = `${rec.distance_km} km`;
   els.eta.textContent = `${rec.eta_min} min`;
-  els.why.innerHTML = rec.reasons.map((r) => `<div>• ${r}</div>`).join('');
+  els.why.innerHTML = rec.reasons.map((r) => `<div><span class="ph-task__tick">✓</span>${r}</div>`).join('');
   initMiniMap(state);
 }
 

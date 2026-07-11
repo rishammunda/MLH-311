@@ -313,7 +313,10 @@ def _run_extraction(scenario_id: str) -> None:
     try:
         resp = client.chat.completions.create(
             model=_DO_MODEL,
-            max_completion_tokens=256,
+            # 512 (not 256): openai-gpt-oss-20b is a reasoning model and can spend
+            # a small budget entirely on internal reasoning, returning empty
+            # content ~25% of the time at 256. 512 is reliably non-empty.
+            max_completion_tokens=512,
             messages=[{"role": "user", "content": prompt}],
         )
         content = resp.choices[0].message.content or ""

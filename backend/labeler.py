@@ -84,7 +84,9 @@ def label_case(case: Case) -> AILabel:
     try:
         resp = _get_client().chat.completions.create(
             model=DO_MODEL,
-            max_completion_tokens=256,
+            # 512 (not 256): a reasoning model like openai-gpt-oss-20b can spend a
+            # small budget entirely on internal reasoning and return empty content.
+            max_completion_tokens=512,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"<report>\n{report_text}\n</report>"},

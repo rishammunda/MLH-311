@@ -8,6 +8,13 @@ import os
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from dotenv import load_dotenv
+
+# Load backend/.env so DIGITALOCEAN_INFERENCE_KEY etc. are available when running
+# `uvicorn main:app` directly. In production (DO App Platform) env vars are
+# injected by the platform and there's no .env file, so this is a harmless no-op.
+load_dotenv()
+
 from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse

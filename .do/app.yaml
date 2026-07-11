@@ -27,18 +27,17 @@ services:
       - key: DO_MODEL
         scope: RUN_TIME
         value: "openai-gpt-oss-20b"
-      - key: SF_APP_TOKEN
+      # Demo mode: load the 396-case frozen snapshot and enable the /api/demo/*
+      # call-simulation endpoints the frontend uses on stage. No live SODA
+      # ingest, no external data feed needed.
+      - key: DEMO_MODE
         scope: RUN_TIME
-        value: ""
-      - key: SEED_LIMIT
-        scope: RUN_TIME
-        value: "40"
+        value: "1"
+      # In-memory store — the demo runs from the snapshot, so no managed DB is
+      # needed (cheaper + faster to deploy).
       - key: DATABASE_URL
         scope: RUN_TIME
-        value: ${cases-db.DATABASE_URL}
-      - key: ENABLE_SIMULATE_SURGE
-        scope: RUN_TIME
-        value: "0"
+        value: "sqlite:///:memory:"
     health_check:
       http_path: /health
 
@@ -58,14 +57,6 @@ static_sites:
       - key: VITE_API_BASE
         scope: BUILD_TIME
         value: "/api"
-
-databases:
-  - name: cases-db
-    engine: PG
-    version: "16"
-    # A deployable demo database. Attach a Managed PostgreSQL cluster for prod;
-    # docs/DEPLOY.md explains the required cluster_name change.
-    production: false
 
 ingress:
   rules:

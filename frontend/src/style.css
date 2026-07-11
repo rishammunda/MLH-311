@@ -844,6 +844,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .action-btn:disabled { opacity: .5; cursor: default; }
 
 .building-panel, .intake { top: 92px; border-color: var(--line); border-radius: 9px; box-shadow: 0 12px 32px rgba(7,16,25,.28); }
+.building-panel { z-index: 18; }
 .building-panel__head, .intake__head { border-bottom-color: var(--line); background: #fff; }
 .building-panel__close, .bubble, .triage, .casecard, .match, .mrow { border-color: var(--line); border-radius: 6px; box-shadow: none; }
 .building-panel__facts, .building-panel__nearby { border-color: var(--line); }

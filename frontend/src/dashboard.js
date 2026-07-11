@@ -335,6 +335,17 @@ async function addDataLayers(buildingsFC) {
     }
   });
   map.addLayer({
+    id: 'pulse-glow',
+    type: 'circle',
+    source: 'pulse',
+    paint: {
+      'circle-color': PIN_COLORS.red,
+      'circle-radius': 0,
+      'circle-blur': 0.72,
+      'circle-opacity': 0
+    }
+  });
+  map.addLayer({
     id: 'pulse-ring',
     type: 'circle',
     source: 'pulse',
@@ -342,7 +353,19 @@ async function addDataLayers(buildingsFC) {
       'circle-color': 'rgba(0,0,0,0)',
       'circle-radius': 0,
       'circle-stroke-color': PIN_COLORS.red,
-      'circle-stroke-width': 2,
+      'circle-stroke-width': 4,
+      'circle-stroke-opacity': 0
+    }
+  });
+  map.addLayer({
+    id: 'pulse-ring-echo',
+    type: 'circle',
+    source: 'pulse',
+    paint: {
+      'circle-color': 'rgba(0,0,0,0)',
+      'circle-radius': 0,
+      'circle-stroke-color': PIN_COLORS.red,
+      'circle-stroke-width': 2.5,
       'circle-stroke-opacity': 0
     }
   });
@@ -365,11 +388,19 @@ async function addDataLayers(buildingsFC) {
   map.on('mouseenter', 'case-symbols', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'case-symbols', () => { map.getCanvas().style.cursor = ''; });
 
+  map.on('click', 'worker-symbols', (e) => {
+    const id = e.features?.[0]?.properties?.id;
+    const worker = workersById.get(id);
+    if (worker) openWorkerCard(worker, e.lngLat);
+  });
+  map.on('mouseenter', 'worker-symbols', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'worker-symbols', () => { map.getCanvas().style.cursor = ''; });
+
   // Keep case pins as the top click target, then inspect the building beneath
   // every other map click. The small-radius fallback makes narrow footprints
   // usable without turning roads and parks into false positives.
   map.on('click', (e) => {
-    if (map.queryRenderedFeatures(e.point, { layers: ['case-symbols'] }).length) return;
+    if (map.queryRenderedFeatures(e.point, { layers: ['case-symbols', 'worker-symbols'] }).length) return;
     let hit = map.queryRenderedFeatures(e.point, { layers: ['buildings-fill'] })[0];
     if (!hit) {
       const p = e.point;
@@ -510,6 +541,35 @@ function upsertWorkers(workers) {
   renderStats();
 }
 
+let workerPopup = null;
+function openWorkerCard(worker, lngLat) {
+  if (workerPopup) workerPopup.remove();
+  const statusLabel = worker.status === 'on_job' ? 'On a job' : worker.status === 'en_route' ? 'En route' : 'Available';
+  const statusClass = worker.status === 'available' ? 'available' : worker.status === 'en_route' ? 'route' : 'busy';
+  const skills = worker.skills.map((skill) => CATEGORY_LABELS[skill] || 'General').join(' · ');
+  workerPopup = new maplibregl.Popup({
+    className: 'worker-popup',
+    closeButton: true,
+    closeOnClick: true,
+    offset: [0, -34],
+    maxWidth: '300px'
+  })
+    .setLngLat(lngLat)
+    .setHTML(`
+      <article class="worker-card">
+        <div class="worker-card__avatar" aria-hidden="true">${escapeHtml(worker.avatar)}</div>
+        <div class="worker-card__identity">
+          <div class="worker-card__eyebrow">FIELD CREW · ${escapeHtml(worker.vehicle)}</div>
+          <h3>${escapeHtml(worker.name)}</h3>
+          <p>${escapeHtml(worker.role)}</p>
+        </div>
+        <span class="worker-card__status worker-card__status--${statusClass}"><i></i>${statusLabel}</span>
+        <div class="worker-card__skills"><span>Qualified response</span><b>${escapeHtml(skills)}</b></div>
+        <a class="worker-card__open" href="/worker.html?worker=${encodeURIComponent(worker.id)}" target="_blank" rel="noopener">Open worker device ↗</a>
+      </article>`)
+    .addTo(map);
+}
+
 // ---------------------------------------------------------------------------
 // Animations: pulse ring, route reveal + marching dashes
 // ---------------------------------------------------------------------------
@@ -524,14 +584,21 @@ function startPulse(lngLat, color) {
     features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: lngLat }, properties: {} }]
   });
   map.setPaintProperty('pulse-ring', 'circle-stroke-color', color);
+  map.setPaintProperty('pulse-ring-echo', 'circle-stroke-color', color);
+  map.setPaintProperty('pulse-glow', 'circle-color', color);
   if (pulseActive) return;
   pulseActive = true;
   const t0 = performance.now();
   (function frame(now) {
     if (!pulseActive) return;
-    const p = ((now - t0) % 1700) / 1700;
-    map.setPaintProperty('pulse-ring', 'circle-radius', 6 + p * 46);
-    map.setPaintProperty('pulse-ring', 'circle-stroke-opacity', 0.85 * (1 - p));
+    const p = ((((now - t0) % 1700) + 1700) % 1700) / 1700;
+    const echo = (p + 0.48) % 1;
+    map.setPaintProperty('pulse-glow', 'circle-radius', 22 + p * 82);
+    map.setPaintProperty('pulse-glow', 'circle-opacity', 0.46 * (1 - p));
+    map.setPaintProperty('pulse-ring', 'circle-radius', 12 + p * 76);
+    map.setPaintProperty('pulse-ring', 'circle-stroke-opacity', 1 - p * 0.78);
+    map.setPaintProperty('pulse-ring-echo', 'circle-radius', 12 + echo * 76);
+    map.setPaintProperty('pulse-ring-echo', 'circle-stroke-opacity', 0.72 * (1 - echo));
     requestAnimationFrame(frame);
   })(t0);
 }
@@ -877,6 +944,7 @@ const matchEl = document.getElementById('match');
 let shownLines = 0;
 let shownFields = new Set();
 let lastPhase = 'idle';
+let lastScenarioId = null;
 let assignedNow = false;
 let caseOnMap = false;
 let recommendedShown = false;
@@ -1087,6 +1155,16 @@ function applyState(state) {
   upsertWorkers(state.workers);
 
   const active = state.phase !== 'idle';
+  const scenarioChanged = active && lastScenarioId && state.scenario?.id !== lastScenarioId;
+  if (scenarioChanged) {
+    resetIntakeUI();
+    clearRoute();
+    stopPulse();
+    chosenWorkerId = null;
+    renderWorkersSource();
+    refreshCases();
+  }
+  if (active) lastScenarioId = state.scenario?.id || null;
   intakeEl.classList.toggle('intake--hidden', !active);
   document.getElementById('btn-call').classList.toggle('btn--busy', active && state.phase !== 'accepted');
 
@@ -1101,6 +1179,7 @@ function applyState(state) {
       refreshCases();
       map.flyTo({ ...HOME, duration: 2500 });
     }
+    lastScenarioId = null;
     lastPhase = 'idle';
     return;
   }
@@ -1194,7 +1273,15 @@ demoMenuToggle.addEventListener('click', () => {
 document.getElementById('btn-call').addEventListener('click', async () => {
   closeBuildingPanel();
   closeCasePanel();
-  await startCall();
+  const scenarioId = document.getElementById('scenario-select').value;
+  await startCall(scenarioId);
+  resetIntakeUI();
+  clearRoute();
+  stopPulse();
+  chosenWorkerId = null;
+  renderWorkersSource();
+  lastScenarioId = null;
+  lastPhase = 'idle';
   poll();
 });
 document.getElementById('btn-reset').addEventListener('click', async () => {

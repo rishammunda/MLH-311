@@ -9,7 +9,10 @@ async function json(url, opts) {
 
 export const fetchCases = (limit = 500) => json(`/api/cases?limit=${limit}`);
 export const fetchDemoState = () => json('/api/demo/state');
-export const startCall = () => json('/api/demo/call/start', { method: 'POST' });
+export const startCall = (scenarioId) => json(
+  `/api/demo/call/start${scenarioId ? `?scenario_id=${encodeURIComponent(scenarioId)}` : ''}`,
+  { method: 'POST' }
+);
 export const acceptTask = () => json('/api/demo/accept', { method: 'POST' });
 export const resetDemo = () => json('/api/demo/reset', { method: 'POST' });
 

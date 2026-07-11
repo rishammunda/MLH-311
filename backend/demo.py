@@ -27,7 +27,8 @@ from models import Case
 router = APIRouter()
 
 # ---------------------------------------------------------------------------
-# The scripted pothole call
+# Scripted calls. Each one is deterministic, but the dashboard can choose a
+# scenario so demos do not feel like the same canned conversation every time.
 # ---------------------------------------------------------------------------
 
 DEMO_CASE_ID = "demo-call-2481"
@@ -61,6 +62,129 @@ FALLBACK_EXTRACTION = {
     "location": "Valencia St & 21st St, Mission",
     "summary": "Large pothole in the northbound bike lane; vehicles swerving and a near-miss with a cyclist reported.",
 }
+
+DEMO_SCENARIOS: list[dict[str, Any]] = [
+    {
+        "id": "valencia-pothole", "case_id": DEMO_CASE_ID,
+        "label": "Bike-lane pothole", "caller": "Resident (415) 555-0182",
+        "lat": DEMO_LAT, "long": DEMO_LONG, "address": "Valencia St & 21st St",
+        "neighborhood": "Mission", "raw_category": "Street Defect", "category": "pothole",
+        "urgency": "high", "safety_risk": True,
+        "summary": FALLBACK_EXTRACTION["summary"],
+        "raw_details": "Large pothole in the bike lane; cars swerving and a cyclist nearly hit.",
+        "transcript": TRANSCRIPT,
+    },
+    {
+        "id": "mission-streetlight", "case_id": "demo-call-2482",
+        "label": "Dark intersection", "caller": "Maya (415) 555-0114",
+        "lat": 37.75242, "long": -122.41818, "address": "Mission St & 24th St",
+        "neighborhood": "Mission", "raw_category": "Streetlight", "category": "streetlight",
+        "urgency": "high", "safety_risk": True,
+        "summary": "Two streetlights are out at a busy crosswalk, leaving pedestrians difficult to see after dark.",
+        "raw_details": "Two lights out at the 24th Street crosswalk; near miss involving a child.",
+        "transcript": [
+            {"t": 1.5, "speaker": "agent", "text": "SF311, what can I help you report today?"},
+            {"t": 4.2, "speaker": "caller", "text": "Both streetlights are out at Mission and 24th, right by the BART entrance."},
+            {"t": 8.0, "speaker": "agent", "text": "Is the intersection completely dark?"},
+            {"t": 11.3, "speaker": "caller", "text": "The crosswalk is. A driver almost missed a child crossing about five minutes ago."},
+            {"t": 16.4, "speaker": "agent", "text": "Are the signal lights still operating?"},
+            {"t": 19.7, "speaker": "caller", "text": "Yes, the traffic signals work. It is the two tall lamps over the crosswalk."},
+            {"t": 24.0, "speaker": "agent", "text": "Thank you. I am marking this for urgent electrical response."},
+        ],
+    },
+    {
+        "id": "geary-water", "case_id": "demo-call-2483",
+        "label": "Water main leak", "caller": "Business owner (415) 555-0167",
+        "lat": 37.78562, "long": -122.42178, "address": "Van Ness Ave & Geary Blvd",
+        "neighborhood": "Cathedral Hill", "raw_category": "Sewer Issues", "category": "water_leak",
+        "urgency": "critical", "safety_risk": True,
+        "summary": "Water is rapidly bubbling through the roadway and flooding the curb lane near a major intersection.",
+        "raw_details": "Water pushing up through asphalt and spreading into the Geary curb lane.",
+        "transcript": [
+            {"t": 1.5, "speaker": "agent", "text": "SF311 emergency intake. Tell me what you are seeing."},
+            {"t": 4.1, "speaker": "caller", "text": "Water is bubbling straight through the pavement at Van Ness and Geary."},
+            {"t": 8.3, "speaker": "agent", "text": "How quickly is it spreading?"},
+            {"t": 11.8, "speaker": "caller", "text": "Fast. The whole curb lane is covered now and the asphalt looks like it is lifting."},
+            {"t": 16.8, "speaker": "agent", "text": "Is traffic able to pass safely?"},
+            {"t": 20.1, "speaker": "caller", "text": "Cars are moving around it, but someone needs to block this lane immediately."},
+            {"t": 24.0, "speaker": "agent", "text": "I have it. Water and traffic crews are being alerted now."},
+        ],
+    },
+    {
+        "id": "haight-graffiti", "case_id": "demo-call-2484",
+        "label": "Storefront graffiti", "caller": "Shop manager (415) 555-0142",
+        "lat": 37.76988, "long": -122.44692, "address": "Haight St & Ashbury St",
+        "neighborhood": "Haight-Ashbury", "raw_category": "Graffiti", "category": "graffiti",
+        "urgency": "medium", "safety_risk": False,
+        "summary": "Fresh graffiti covers a storefront shutter and adjacent wayfinding sign at Haight and Ashbury.",
+        "raw_details": "Large fresh tag across store shutter and public wayfinding sign.",
+        "transcript": [
+            {"t": 1.5, "speaker": "agent", "text": "SF311, what would you like to report?"},
+            {"t": 4.4, "speaker": "caller", "text": "Someone tagged our entire storefront shutter overnight at Haight and Ashbury."},
+            {"t": 8.5, "speaker": "agent", "text": "Is the graffiti only on private property?"},
+            {"t": 12.2, "speaker": "caller", "text": "It also covers the city wayfinding sign beside our door."},
+            {"t": 17.0, "speaker": "agent", "text": "Do you see any hateful or threatening language?"},
+            {"t": 20.4, "speaker": "caller", "text": "No, it is a large silver tag. It still looks wet."},
+            {"t": 24.0, "speaker": "agent", "text": "Thanks. I will send this to graffiti abatement."},
+        ],
+    },
+    {
+        "id": "bayview-dumping", "case_id": "demo-call-2485",
+        "label": "Illegal dumping", "caller": "Resident (415) 555-0191",
+        "lat": 37.73461, "long": -122.39082, "address": "3rd St & Palou Ave",
+        "neighborhood": "Bayview", "raw_category": "Illegal Dumping", "category": "illegal_dumping",
+        "urgency": "medium", "safety_risk": True,
+        "summary": "Mattresses and construction debris block the bike lane and part of the sidewalk near Palou Avenue.",
+        "raw_details": "Dumped mattresses, lumber, and broken tile blocking bike lane and sidewalk.",
+        "transcript": [
+            {"t": 1.5, "speaker": "agent", "text": "SF311, how can I assist?"},
+            {"t": 4.0, "speaker": "caller", "text": "A truck dumped mattresses and construction debris at Third and Palou."},
+            {"t": 8.2, "speaker": "agent", "text": "Is any travel lane or sidewalk blocked?"},
+            {"t": 11.5, "speaker": "caller", "text": "The bike lane is fully blocked and people in wheelchairs cannot use the sidewalk."},
+            {"t": 16.7, "speaker": "agent", "text": "Did you see the vehicle or a plate?"},
+            {"t": 20.0, "speaker": "caller", "text": "A white pickup, but I could not read the plate. It left toward Evans."},
+            {"t": 24.0, "speaker": "agent", "text": "Understood. Environmental services will receive the report."},
+        ],
+    },
+    {
+        "id": "bryant-encampment", "case_id": "demo-call-2486",
+        "label": "Blocked sidewalk", "caller": "Mobility-aid user (415) 555-0138",
+        "lat": 37.76948, "long": -122.41304, "address": "Bryant St & 13th St",
+        "neighborhood": "SoMa", "raw_category": "Encampment", "category": "encampment",
+        "urgency": "medium", "safety_risk": False,
+        "summary": "Tents and belongings leave no accessible path along the sidewalk near the freeway on-ramp.",
+        "raw_details": "Sidewalk fully obstructed with no accessible path around tents and belongings.",
+        "transcript": [
+            {"t": 1.5, "speaker": "agent", "text": "SF311, what issue are you calling about?"},
+            {"t": 4.2, "speaker": "caller", "text": "The sidewalk at Bryant and 13th is completely blocked by tents and belongings."},
+            {"t": 8.1, "speaker": "agent", "text": "Is there an accessible path around the obstruction?"},
+            {"t": 11.7, "speaker": "caller", "text": "No. I use a walker and had to step into the street beside the freeway ramp."},
+            {"t": 16.5, "speaker": "agent", "text": "Is anyone in immediate medical danger?"},
+            {"t": 19.8, "speaker": "caller", "text": "Not that I can see. We just need a safe path restored."},
+            {"t": 24.0, "speaker": "agent", "text": "Thank you. I am routing this to the outreach team."},
+        ],
+    },
+    {
+        "id": "embarcadero-signal", "case_id": "demo-call-2487",
+        "label": "Damaged curb ramp", "caller": "Visitor (415) 555-0176",
+        "lat": 37.79825, "long": -122.39710, "address": "Embarcadero & Broadway",
+        "neighborhood": "Waterfront", "raw_category": "Sidewalk Defect", "category": "other",
+        "urgency": "high", "safety_risk": True,
+        "summary": "A broken curb-ramp plate has created a sharp drop and trip hazard at a crowded waterfront crossing.",
+        "raw_details": "Metal curb-ramp plate shifted, exposing a deep gap at the Broadway crossing.",
+        "transcript": [
+            {"t": 1.5, "speaker": "agent", "text": "SF311, what would you like to report?"},
+            {"t": 4.3, "speaker": "caller", "text": "The curb ramp at Embarcadero and Broadway has a metal plate sticking up."},
+            {"t": 8.4, "speaker": "agent", "text": "Is it blocking the accessible crossing?"},
+            {"t": 11.9, "speaker": "caller", "text": "Yes. There is a deep gap, and an older man just tripped over the edge."},
+            {"t": 16.6, "speaker": "agent", "text": "Does he need medical assistance?"},
+            {"t": 20.0, "speaker": "caller", "text": "He says he is okay, but the crossing is packed and someone else could fall."},
+            {"t": 24.0, "speaker": "agent", "text": "Thank you. I am escalating the sidewalk hazard now."},
+        ],
+    },
+]
+
+SCENARIOS_BY_ID = {scenario["id"]: scenario for scenario in DEMO_SCENARIOS}
 
 # ---------------------------------------------------------------------------
 # Mock field crews
@@ -100,6 +224,7 @@ _state: dict[str, Any] = {
     "case_created": False,
     "accepted_at": None,
     "codex_extraction": None,  # dict once the codex thread returns
+    "scenario_id": DEMO_SCENARIOS[0]["id"],
 }
 
 
@@ -115,10 +240,20 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
+def _scenario() -> dict[str, Any]:
+    return SCENARIOS_BY_ID.get(_state.get("scenario_id"), DEMO_SCENARIOS[0])
+
+
 def _extraction_fields() -> dict[str, str]:
     """Codex result if it arrived and looks sane, else the scripted values."""
     codex = _state.get("codex_extraction")
-    fields = dict(FALLBACK_EXTRACTION)
+    scenario = _scenario()
+    fields = {
+        "category": scenario["category"],
+        "urgency": scenario["urgency"],
+        "location": f'{scenario["address"]}, {scenario["neighborhood"]}',
+        "summary": scenario["summary"],
+    }
     if isinstance(codex, dict):
         if codex.get("urgency") in ("high", "critical"):
             fields["urgency"] = codex["urgency"]
@@ -128,9 +263,10 @@ def _extraction_fields() -> dict[str, str]:
     return fields
 
 
-def _run_codex_extraction() -> None:
+def _run_codex_extraction(scenario_id: str) -> None:
     """Ask codex to triage the transcript. Best-effort, deterministic fallback."""
-    transcript = "\n".join(f"{ln['speaker'].upper()}: {ln['text']}" for ln in TRANSCRIPT)
+    scenario = SCENARIOS_BY_ID.get(scenario_id, DEMO_SCENARIOS[0])
+    transcript = "\n".join(f"{ln['speaker'].upper()}: {ln['text']}" for ln in scenario["transcript"])
     prompt = (
         "You are a 311 triage classifier. Below is a resident call transcript. "
         "Respond with ONLY a JSON object, no prose, shaped exactly like: "
@@ -156,6 +292,8 @@ def _run_codex_extraction() -> None:
             if "<" in values or "|" in values:
                 continue
             with _lock:
+                if _state.get("scenario_id") != scenario_id:
+                    return
                 _state["codex_extraction"] = parsed
             print(f"[demo] codex extraction: {parsed}")
             break
@@ -166,21 +304,22 @@ def _run_codex_extraction() -> None:
 
 
 def _build_case(fields: dict[str, str]) -> Case:
+    scenario = _scenario()
     return Case(
-        id=DEMO_CASE_ID,
+        id=scenario["case_id"],
         requested_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        raw_category="Street Defect",
-        raw_details="Caller: large pothole at Valencia & 21st, cars swerving, near-miss with cyclist",
-        address="Valencia St & 21st St",
-        neighborhood="Mission",
-        lat=DEMO_LAT,
-        long=DEMO_LONG,
+        raw_category=scenario["raw_category"],
+        raw_details=scenario["raw_details"],
+        address=scenario["address"],
+        neighborhood=scenario["neighborhood"],
+        lat=scenario["lat"],
+        long=scenario["long"],
         status="Open",
         source="Live call (demo)",
-        ai_category="pothole",
+        ai_category=scenario["category"],
         ai_urgency=fields["urgency"],  # type: ignore[arg-type]
         ai_summary=fields["summary"],
-        safety_risk=True,
+        safety_risk=scenario["safety_risk"],
     )
 
 
@@ -193,13 +332,22 @@ def _recommend(case_lat: float, case_long: float, category: str) -> Optional[dic
     best = min(candidates, key=lambda w: _haversine_km(case_lat, case_long, w["lat"], w["long"]))
     dist = _haversine_km(case_lat, case_long, best["lat"], best["long"])
     eta = max(2, round(dist / 0.4))  # ~24 km/h through city streets
+    qualification = {
+        "pothole": "Certified for street repair",
+        "streetlight": "Licensed electrical response crew",
+        "water_leak": "Water and sewer response certified",
+        "graffiti": "Assigned to graffiti abatement",
+        "illegal_dumping": "Equipped for debris removal",
+        "encampment": "Trained outreach response team",
+        "other": "Qualified for general street response",
+    }.get(category, "Qualified for this service request")
     return {
         "worker_id": best["id"],
         "distance_km": round(dist, 1),
         "eta_min": eta,
         "reasons": [
             f"Closest available crew — {dist:.1f} km away",
-            "Certified for street repair",
+            qualification,
             f"ETA ≈ {eta} min from {best['vehicle']}",
         ],
     }
@@ -227,6 +375,7 @@ def demo_state() -> dict[str, Any]:
             else:
                 phase = "accepted"
 
+        scenario = _scenario()
         fields = _extraction_fields()
 
         # Create the case exactly once, the moment the timeline crosses the mark.
@@ -235,7 +384,7 @@ def demo_state() -> dict[str, Any]:
             _state["case_created"] = True
 
         lines = (
-            [ln for ln in TRANSCRIPT if ln["t"] <= elapsed] if started is not None else []
+            [ln for ln in scenario["transcript"] if ln["t"] <= elapsed] if started is not None else []
         )
         revealed = (
             [k for k, t in EXTRACTION_REVEALS.items() if elapsed >= t]
@@ -243,15 +392,15 @@ def demo_state() -> dict[str, Any]:
             else []
         )
 
-        case = store.get_case(DEMO_CASE_ID) if _state["case_created"] else None
+        case = store.get_case(scenario["case_id"]) if _state["case_created"] else None
 
         recommendation = None
         if phase in ("recommended", "accepted"):
-            rec = _recommend(DEMO_LAT, DEMO_LONG, "pothole")
+            rec = _recommend(scenario["lat"], scenario["long"], scenario["category"])
             if rec:
                 recommendation = {
                     **rec,
-                    "case_id": DEMO_CASE_ID,
+                    "case_id": scenario["case_id"],
                     "status": "accepted" if phase == "accepted" else "pending",
                 }
 
@@ -264,7 +413,9 @@ def demo_state() -> dict[str, Any]:
         return {
             "phase": phase,
             "elapsed": round(elapsed, 2),
-            "caller": {"name": "Resident (415) 555-0182", "line": "SF311 Voice Intake"},
+            "caller": {"name": scenario["caller"], "line": "SF311 Voice Intake"},
+            "scenario": {"id": scenario["id"], "label": scenario["label"]},
+            "scenarios": [{"id": item["id"], "label": item["label"], "address": item["address"]} for item in DEMO_SCENARIOS],
             "transcript": lines,
             "transcript_done": started is not None and elapsed >= CALL_END,
             "extraction": {
@@ -286,14 +437,22 @@ async def get_demo_state():
 
 @router.post("/demo/call/start")
 @router.post("/api/demo/call/start", include_in_schema=False)
-async def start_call():
+async def start_call(scenario_id: Optional[str] = None):
     with _lock:
         started = _state["started_at"]
         if started is not None and _state["accepted_at"] is None and _now() - started < RECOMMENDED_AT:
             return {"ok": True, "note": "call already in progress"}
         _reset_locked()
+        if scenario_id:
+            if scenario_id not in SCENARIOS_BY_ID:
+                raise HTTPException(status_code=404, detail="Unknown demo scenario")
+            _state["scenario_id"] = scenario_id
         _state["started_at"] = _now()
-    threading.Thread(target=_run_codex_extraction, daemon=True).start()
+    threading.Thread(
+        target=_run_codex_extraction,
+        args=(_state["scenario_id"],),
+        daemon=True,
+    ).start()
     return {"ok": True}
 
 
@@ -313,8 +472,10 @@ def _reset_locked() -> None:
     _state["case_created"] = False
     _state["accepted_at"] = None
     _state["codex_extraction"] = None
+    _state["scenario_id"] = DEMO_SCENARIOS[0]["id"]
     try:
-        store.delete_case(DEMO_CASE_ID)
+        for scenario in DEMO_SCENARIOS:
+            store.delete_case(scenario["case_id"])
     except Exception:
         pass
 

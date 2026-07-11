@@ -3,22 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#05080f" />
+    <meta name="theme-color" content="#f2f2f7" />
     <title>Field Ops · Marcus Rivera</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
   <body class="phone-body">
     <div class="phone">
+      <div class="ios-status" aria-hidden="true">
+        <span>9:41</span>
+        <span class="ios-status__island"></span>
+        <span class="ios-status__signals">● ◖ ᯤ</span>
+      </div>
       <header class="ph-head">
         <div class="ph-app">
-          <span class="ph-app__mark">311</span> FIELD OPS
-          <span class="ph-app__net" id="net-dot"></span>
+          <span class="ph-app__mark">311</span>
+          <span>SF FIELD SERVICE</span>
+          <span class="ph-app__net" id="net-dot" title="Live sync"></span>
         </div>
         <div class="ph-me">
-          <div class="ph-me__avatar">MR</div>
+          <div class="ph-me__avatar" id="me-avatar">MR</div>
           <div class="ph-me__id">
-            <div class="ph-me__name">Marcus Rivera</div>
-            <div class="ph-me__role">Street Repair · Crew 3 · Truck PW-214</div>
+            <div class="ph-me__overline">Good afternoon</div>
+            <div class="ph-me__name" id="me-name">Marcus Rivera</div>
+            <div class="ph-me__role" id="me-role">Street Repair · Crew 3 · Truck PW-214</div>
           </div>
           <div class="ph-me__status" id="me-status">ON SHIFT</div>
         </div>
@@ -27,25 +34,25 @@
       <main class="ph-main" id="ph-main">
         <!-- Idle -->
         <section class="ph-idle" id="ph-idle">
-          <div class="ph-idle__radar"><span></span><span></span><span></span></div>
-          <div class="ph-idle__title">Standing by</div>
-          <div class="ph-idle__sub">No pending assignments — dispatch will notify you here.</div>
-          <div class="ph-done">
-            <div class="ph-done__head">Completed today</div>
-            <div class="ph-done__item"><span class="ph-done__check">✓</span><div><b>Pothole patch</b><span>Guerrero St &amp; 18th St · 09:40</span></div></div>
-            <div class="ph-done__item"><span class="ph-done__check">✓</span><div><b>Sidewalk defect</b><span>Folsom St &amp; 22nd St · 11:15</span></div></div>
+          <div class="ph-section-title"><span>Current assignment</span><b>Live</b></div>
+          <div class="ph-idle__card">
+            <div class="ph-idle__radar"><i></i><span></span><span></span><span></span></div>
+            <div class="ph-idle__title">You're all caught up</div>
+            <div class="ph-idle__sub">Dispatch is watching your area.<br />Your next assignment will appear here.</div>
           </div>
         </section>
 
         <!-- Incoming task -->
         <section class="ph-task ph-task--hidden" id="ph-task">
-          <div class="ph-task__banner" id="task-banner">NEW ASSIGNMENT · RECOMMENDED FOR YOU</div>
+          <div class="ph-section-title"><span>New assignment</span><b class="ph-section-title__urgent">Action needed</b></div>
           <div class="ph-task__card">
+            <div class="ph-task__banner" id="task-banner"><span>Dispatch recommendation</span><i>New</i></div>
             <div class="ph-task__row1">
               <span class="ph-chip ph-chip--cat" id="task-cat">POTHOLE</span>
               <span class="ph-chip ph-chip--urg" id="task-urg">HIGH</span>
               <span class="ph-task__score" id="task-score">—</span>
             </div>
+            <div class="ph-task__eyebrow">SERVICE LOCATION</div>
             <div class="ph-task__addr" id="task-addr">—</div>
             <div class="ph-task__hood" id="task-hood">—</div>
             <div class="ph-task__sum" id="task-sum">—</div>
@@ -54,8 +61,8 @@
               <div><b id="task-eta">—</b><span>ETA</span></div>
               <div><b id="task-src">Voice</b><span>source</span></div>
             </div>
-            <div id="task-map" class="ph-task__map"></div>
-            <div class="ph-task__why" id="task-why"></div>
+            <div class="ph-task__mapwrap"><div id="task-map" class="ph-task__map"></div><span class="ph-task__maplive">Route preview</span></div>
+            <div class="ph-task__why"><div class="ph-task__whytitle">Why dispatch chose you</div><div id="task-why"></div></div>
           </div>
           <div class="ph-task__actions" id="task-actions">
             <button class="ph-btn ph-btn--ghost" id="btn-decline">Decline</button>
@@ -66,7 +73,8 @@
         <!-- Accepted -->
         <section class="ph-ok ph-ok--hidden" id="ph-ok">
           <div class="ph-ok__ring"><div class="ph-ok__check">✓</div></div>
-          <div class="ph-ok__title">You're assigned</div>
+          <div class="ph-ok__eyebrow">Assignment confirmed</div>
+          <div class="ph-ok__title">You're on the way</div>
           <div class="ph-ok__sub" id="ok-sub">Dispatch has been notified.</div>
           <button class="ph-btn ph-btn--nav" id="btn-nav">Navigate to site ↗</button>
           <div class="ph-ok__hint">Status shared with the operations dashboard in real time.</div>

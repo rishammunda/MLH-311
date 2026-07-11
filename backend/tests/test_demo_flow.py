@@ -72,6 +72,18 @@ class DemoFlowTests(unittest.TestCase):
         self.assertEqual(fields["urgency"], "high")
         self.assertEqual(fields["summary"], demo.FALLBACK_EXTRACTION["summary"])
 
+    def test_seven_scenarios_have_distinct_locations_and_conversations(self):
+        self.assertEqual(len(demo.DEMO_SCENARIOS), 7)
+        self.assertEqual(len({(item["lat"], item["long"]) for item in demo.DEMO_SCENARIOS}), 7)
+        self.assertEqual(len({tuple(line["text"] for line in item["transcript"]) for item in demo.DEMO_SCENARIOS}), 7)
+
+    def test_selected_scenario_drives_case_and_recommendation(self):
+        demo._state["scenario_id"] = "mission-streetlight"
+        state = self._state_at(40.0)
+        self.assertEqual(state["case"]["address"], "Mission St & 24th St")
+        self.assertEqual(state["case"]["ai_category"], "streetlight")
+        self.assertEqual(state["recommendation"]["worker_id"], "w2")
+
 
 if __name__ == "__main__":
     unittest.main()

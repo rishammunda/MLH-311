@@ -472,6 +472,32 @@ button, a { -webkit-tap-highlight-color: transparent; }
   box-shadow: 3px 3px 0 var(--ink);
 }
 
+.scenario-picker {
+  height: 36px;
+  min-width: 160px;
+  padding: 4px 9px 3px;
+  display: grid;
+  align-content: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255,255,255,.78);
+}
+.scenario-picker span {
+  color: var(--muted);
+  font: 800 7px/1 var(--mono);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.scenario-picker select {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 700 10px/1.2 var(--font);
+  cursor: pointer;
+}
+
 /* ----------------------------------------------------------------- queue */
 
 .queue {
@@ -731,6 +757,63 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .building-panel__nearby-count { color: var(--blue-dark); font: 800 18px/1 var(--mono); }
 .building-panel__note { margin-top: 11px; color: var(--muted); font-size: 9.5px; line-height: 1.45; }
 
+/* Map worker profile card */
+.worker-popup .maplibregl-popup-tip { border-top-color: #fff; }
+.worker-popup .maplibregl-popup-content {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 5px 5px 0 rgba(20,31,42,.95), 0 18px 50px rgba(4,12,21,.28);
+}
+.worker-popup .maplibregl-popup-close-button {
+  z-index: 2;
+  top: 7px;
+  right: 7px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 18px;
+}
+.worker-popup .maplibregl-popup-close-button:hover { background: var(--paper-2); color: var(--ink); }
+.worker-card {
+  width: 282px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 12px;
+  color: var(--ink);
+}
+.worker-card__avatar {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: #dce6f6;
+  color: var(--blue-dark);
+  font: 900 14px/1 var(--font);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.worker-card__identity { min-width: 0; padding-right: 16px; }
+.worker-card__eyebrow { color: var(--muted); font: 800 7px/1.2 var(--mono); letter-spacing: .09em; }
+.worker-card h3 { margin-top: 5px; font-size: 15px; line-height: 1.1; }
+.worker-card p { margin-top: 4px; color: var(--ink-soft); font-size: 10px; }
+.worker-card__status { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; font: 800 9px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.worker-card__status i { width: 8px; height: 8px; border-radius: 50%; background: var(--serious); }
+.worker-card__status--available { color: var(--good); }
+.worker-card__status--available i { background: var(--good); box-shadow: 0 0 0 4px rgba(12,163,12,.12); }
+.worker-card__status--route { color: var(--blue); }
+.worker-card__status--route i { background: var(--blue); box-shadow: 0 0 0 4px rgba(57,135,229,.14); }
+.worker-card__skills { grid-column: 1 / -1; padding: 10px; border: 1px solid var(--line); background: var(--paper-2); }
+.worker-card__skills span { display: block; color: var(--muted); font: 800 7px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.worker-card__skills b { display: block; margin-top: 5px; font-size: 10.5px; }
+.worker-card__open { grid-column: 1 / -1; color: var(--blue-dark); font-size: 10.5px; font-weight: 800; text-decoration: none; }
+.worker-card__open:hover { text-decoration: underline; }
+
 /* ---------------------------------------------------------------- intake */
 
 .intake {
@@ -938,6 +1021,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .stat { min-width: 82px; padding-inline: 12px; }
 }
 @media (max-width: 1100px) {
+  .scenario-picker { display: none; }
   .stats { display: none; }
   .brand { border-right: 0; }
 }

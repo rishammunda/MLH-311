@@ -64,7 +64,19 @@
       <div class="topbar__right">
         <div class="sync" id="sync-status"><span class="sync__dot"></span><span><b>Data feed connected</b><small id="sync-age">Updating…</small></span></div>
         <div class="clock" id="clock">--:--:--</div>
-        <button class="workerlink workerlink--primary" id="btn-call" type="button">+ New intake</button>
+        <label class="scenario-picker" for="scenario-select">
+          <span>Location</span>
+          <select id="scenario-select" aria-label="Choose an intake location">
+            <option value="valencia-pothole">Valencia &amp; 21st</option>
+            <option value="mission-streetlight">Mission &amp; 24th</option>
+            <option value="geary-water">Van Ness &amp; Geary</option>
+            <option value="haight-graffiti">Haight &amp; Ashbury</option>
+            <option value="bayview-dumping">3rd &amp; Palou</option>
+            <option value="bryant-encampment">Bryant &amp; 13th</option>
+            <option value="embarcadero-signal">Embarcadero &amp; Broadway</option>
+          </select>
+        </label>
+        <button class="workerlink workerlink--primary" id="btn-call" type="button">Start intake</button>
         <a class="workerlink" href="/worker.html" target="_blank" rel="noopener">Worker app ↗</a>
         <div class="demomenu" id="demo-menu">
           <button class="demomenu__toggle" id="demo-menu-toggle" type="button" aria-expanded="false" aria-controls="demo-menu-panel">•••</button>

@@ -4,7 +4,7 @@ import './worker.css';
 import { fetchDemoState, acceptTask, CATEGORY_LABELS, PIN_COLORS } from './api.js';
 import { CATEGORY_COLORS, glyphSvg, casePinSvg, crewBadgeSvg } from './icons.js';
 
-const ME = 'w1'; // Marcus Rivera — the crew the demo recommends
+const ME = new URLSearchParams(window.location.search).get('worker') || 'w1';
 
 const els = {
   idle: document.getElementById('ph-idle'),
@@ -28,6 +28,15 @@ let view = 'idle'; // idle | task | accepted
 let declined = false;
 let miniMap = null;
 
+function renderIdentity(state) {
+  const me = state.workers.find((worker) => worker.id === ME) || state.workers[0];
+  if (!me) return;
+  document.getElementById('me-avatar').textContent = me.avatar;
+  document.getElementById('me-name').textContent = me.name;
+  document.getElementById('me-role').textContent = `${me.role} · ${me.vehicle}`;
+  document.title = `Field Ops · ${me.name}`;
+}
+
 function show(next) {
   if (view === next) return;
   view = next;
@@ -50,14 +59,24 @@ function initMiniMap(state) {
       sources: {
         carto: {
           type: 'raster',
-          tiles: ['https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png'],
+          tiles: ['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'],
           tileSize: 256,
           attribution: '© CARTO · © OpenStreetMap'
+        },
+        route: {
+          type: 'geojson',
+          data: me ? {
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: [[me.long, me.lat], [c.long, c.lat]] },
+            properties: {}
+          } : { type: 'FeatureCollection', features: [] }
         }
       },
       layers: [
-        { id: 'bg', type: 'background', paint: { 'background-color': '#0a1120' } },
-        { id: 'carto', type: 'raster', source: 'carto', paint: { 'raster-opacity': 1, 'raster-brightness-max': 0.95, 'raster-contrast': 0.08 } }
+        { id: 'bg', type: 'background', paint: { 'background-color': '#e9edf2' } },
+        { id: 'carto', type: 'raster', source: 'carto', paint: { 'raster-opacity': 0.92, 'raster-saturation': -0.35, 'raster-brightness-max': 1 } },
+        { id: 'route-halo', type: 'line', source: 'route', paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.9 } },
+        { id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#087ff5', 'line-width': 4, 'line-opacity': 0.96, 'line-dasharray': [1.2, 1.2] } }
       ]
     },
     center: [c.long, c.lat],
@@ -81,7 +100,7 @@ function initMiniMap(state) {
       const b = new maplibregl.LngLatBounds();
       b.extend([c.long, c.lat]);
       b.extend([me.long, me.lat]);
-      miniMap.fitBounds(b, { padding: { top: 34, bottom: 46, left: 60, right: 60 }, duration: 0 });
+      miniMap.fitBounds(b, { padding: { top: 70, bottom: 42, left: 48, right: 48 }, duration: 0, maxZoom: 14.4 });
     }, 120);
   }
 }
@@ -107,6 +126,7 @@ function renderTask(state) {
 async function poll() {
   try {
     const state = await fetchDemoState();
+    renderIdentity(state);
     els.net.classList.remove('ph-app__net--down');
     const rec = state.recommendation;
     const mine = rec && rec.worker_id === ME;
@@ -145,8 +165,12 @@ document.getElementById('btn-decline').addEventListener('click', () => {
   show('idle');
 });
 document.getElementById('btn-nav').addEventListener('click', () => {
-  document.getElementById('btn-nav').textContent = 'Navigation started (demo)';
+  fetchDemoState().then((state) => {
+    if (!state.case) return;
+    window.open(`https://maps.apple.com/?daddr=${state.case.lat},${state.case.long}`, '_blank', 'noopener');
+  });
 });
 
 poll();
 setInterval(poll, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });

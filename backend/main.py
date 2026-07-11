@@ -17,12 +17,14 @@ from slowapi.util import get_remote_address
 
 import ingest
 import store
+from demo import router as demo_router
 from labeler import apply_label, label_case
 from models import CasesResponse, SurgeRequest, SurgeResponse
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="SF311 Live Triage")
 app.state.limiter = limiter
+app.include_router(demo_router)
 
 # Frontend runs on a different origin (Vite dev server / DO static site).
 app.add_middleware(
@@ -55,6 +57,15 @@ async def _ingest_and_label(limit: int = 50) -> int:
 
 @app.on_event("startup")
 async def _startup():
+    # Demo mode: populate from the frozen snapshot — no network, no API keys,
+    # identical data every run. The live SODA path below stays intact.
+    if os.getenv("DEMO_MODE") == "1":
+        import seed
+
+        loaded = seed.load_seed()
+        print(f"[startup] demo mode: loaded {loaded} snapshot cases")
+        return
+
     # Seed the dashboard with a first batch so the demo isn't empty on load.
     try:
         await _ingest_and_label(limit=int(os.getenv("SEED_LIMIT", "40")))

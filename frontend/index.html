@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SF311 Live Triage · Operations</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <!-- Top bar: brand + live stat tiles -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand__seal">311</div>
+        <div class="brand__text">
+          <div class="brand__name">SF311 <span>LIVE TRIAGE</span></div>
+          <div class="brand__sub">City &amp; County of San Francisco · Operations</div>
+        </div>
+      </div>
+      <div class="stats" id="stats">
+        <div class="stat"><div class="stat__value" id="stat-open">—</div><div class="stat__label">Open cases</div></div>
+        <div class="stat"><div class="stat__value stat__value--critical" id="stat-critical">—</div><div class="stat__label">Critical</div></div>
+        <div class="stat"><div class="stat__value stat__value--serious" id="stat-clusters">—</div><div class="stat__label">Hot clusters</div></div>
+        <div class="stat"><div class="stat__value stat__value--good" id="stat-crews">—</div><div class="stat__label">Crews free</div></div>
+      </div>
+      <div class="topbar__right">
+        <div class="livechip"><span class="livechip__dot"></span>LIVE</div>
+        <div class="clock" id="clock">--:--:--</div>
+        <a class="workerlink" href="/worker.html" target="_blank" rel="noopener">Worker app ↗</a>
+      </div>
+    </header>
+
+    <!-- Left: ranked priority queue -->
+    <aside class="queue" id="queue">
+      <div class="queue__head">
+        <div class="queue__title">Priority queue</div>
+        <div class="queue__hint">AI-ranked · top of <span id="queue-total">0</span></div>
+      </div>
+      <div class="queue__list" id="queue-list"></div>
+      <div class="queue__legend">
+        <span><i class="dot dot--critical"></i>Critical</span>
+        <span><i class="dot dot--serious"></i>Elevated</span>
+        <span><i class="dot dot--warning"></i>Routine</span>
+      </div>
+    </aside>
+
+    <!-- Right: live intake panel (hidden until a call starts) -->
+    <aside class="intake intake--hidden" id="intake">
+      <div class="intake__head">
+        <div>
+          <div class="intake__title"><span class="rec" id="rec-dot"></span>Live intake</div>
+          <div class="intake__caller" id="intake-caller">SF311 Voice Line</div>
+        </div>
+        <div class="intake__timer" id="call-timer">00:00</div>
+      </div>
+      <div class="intake__body" id="intake-body">
+        <div class="transcript" id="transcript"></div>
+        <div class="triage triage--hidden" id="triage">
+          <div class="triage__head">AI triage <span class="triage__engine">· model extraction</span></div>
+          <div class="triage__grid">
+            <div class="triage__row" data-field="category"><span class="triage__k">Category</span><span class="triage__v" id="tri-category"></span></div>
+            <div class="triage__row" data-field="urgency"><span class="triage__k">Urgency</span><span class="triage__v" id="tri-urgency"></span></div>
+            <div class="triage__row" data-field="location"><span class="triage__k">Location</span><span class="triage__v" id="tri-location"></span></div>
+            <div class="triage__row" data-field="summary"><span class="triage__k">Summary</span><span class="triage__v" id="tri-summary"></span></div>
+          </div>
+        </div>
+        <div class="casecard casecard--hidden" id="casecard">
+          <div class="casecard__badge">NEW CASE</div>
+          <div class="casecard__title" id="casecard-title">—</div>
+          <div class="casecard__meta" id="casecard-meta">—</div>
+        </div>
+        <div class="match match--hidden" id="match">
+          <div class="match__head" id="match-head">Locating nearest crew…</div>
+          <div class="match__list" id="match-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Bottom-right demo controls -->
+    <div class="controls">
+      <button class="btn btn--primary" id="btn-call">
+        <span class="btn__icon">☎</span> Simulate incoming call
+      </button>
+      <button class="btn btn--ghost" id="btn-reset" title="Reset demo">Reset</button>
+    </div>
+
+    <div class="toast toast--hidden" id="toast"></div>
+
+    <!-- Attribution (MIT skyline + data sources) -->
+    <div class="credits" id="credits">
+      <button class="credits__toggle" id="credits-toggle">ⓘ</button>
+      <div class="credits__panel">
+        <div>3D skyline © <a href="https://github.com/perlakay/nyc-building-history" target="_blank" rel="noopener">Perla Dahan — The Skyline Project</a> (MIT)</div>
+        <div>Footprints &amp; heights · <a href="https://data.sfgov.org/Geographic-Locations-and-Boundaries/Building-Footprints/ynuv-fyni" target="_blank" rel="noopener">DataSF</a></div>
+        <div>311 snapshot · <a href="https://data.sfgov.org/" target="_blank" rel="noopener">SF311 open data</a></div>
+        <div>Basemap © <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
+      </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="boot" id="boot">
+      <div class="boot__inner">
+        <div class="boot__seal">311</div>
+        <div class="boot__title">SF311 LIVE TRIAGE</div>
+        <div class="boot__bar"><div class="boot__fill" id="boot-fill"></div></div>
+        <div class="boot__hint" id="boot-hint">initializing city model…</div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/dashboard.js"></script>
+  </body>
+</html>

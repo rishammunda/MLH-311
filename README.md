@@ -20,7 +20,27 @@ Multiple reports on the same issue escalate the pin from yellow → orange → *
 - **[backend/](backend/)** — FastAPI ingest + AI labeler + read-only API. See [backend/README.md](backend/README.md).
 - **[frontend/](frontend/)** — React + Leaflet dashboard (map + ranked queue).
 
-## Quick start (backend)
+## 🎬 Run the demo (one command)
+
+```bash
+./demo.sh
+```
+
+Then open:
+
+- **Dashboard** — http://localhost:5173 (3D San Francisco, 396 real 311 cases, priority queue)
+- **Worker phone** — http://localhost:5173/worker.html (open on a second window or your phone)
+
+Click **“☎ Simulate incoming call”** and watch the full loop: mock resident call →
+transcript → AI extraction → new pin animates onto the 3D map → nearest qualified crew
+recommended → the task lands on the worker phone → accepting it updates the dashboard live.
+**Reset** puts everything back. Full walkthrough + 2-minute script: [docs/DEMO.md](docs/DEMO.md).
+
+Demo mode needs **no API keys and no network data feed** — it runs from a frozen snapshot of
+real SF311 data. The live AI-extraction step shells out to `codex exec` if available and
+falls back to scripted values, so the demo works every time.
+
+## Quick start (backend only, live-ingest mode)
 
 ```bash
 cd backend

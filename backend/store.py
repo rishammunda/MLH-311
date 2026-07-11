@@ -165,6 +165,18 @@ class CaseStore:
             row = self._connection.execute(sql, (case_id,)).fetchone()
             return Case.model_validate(dict(row)) if row else None
 
+    def delete_case(self, case_id: str) -> None:
+        with self._lock:
+            try:
+                self._connection.execute(
+                    f"DELETE FROM cases WHERE id = {self._placeholder}", (case_id,)
+                )
+                self._write_cases(prioritize(self._all_cases()))
+                self._connection.commit()
+            except Exception:
+                self._connection.rollback()
+                raise
+
     def count(self) -> int:
         with self._lock:
             row = self._connection.execute("SELECT COUNT(*) AS total FROM cases").fetchone()
@@ -196,6 +208,10 @@ def get_cases(
 
 def get_case(case_id: str) -> Case | None:
     return _store.get_case(case_id)
+
+
+def delete_case(case_id: str) -> None:
+    _store.delete_case(case_id)
 
 
 def count() -> int:

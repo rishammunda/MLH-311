@@ -8,6 +8,107 @@ import {
 import { CATEGORY_COLORS, glyphSvg, casePinSvg, crewBadgeSvg } from './icons.js';
 
 // ---------------------------------------------------------------------------
+// Cinematic landing → live operations transition
+// ---------------------------------------------------------------------------
+
+const landing = document.getElementById('landing');
+const enterDashboard = document.getElementById('enter-dashboard');
+const entrySlider = document.getElementById('entry-slider');
+let sliderResetTimer;
+let sliderDragging = false;
+
+function paintSlider(value) {
+  const progress = Math.max(0, Math.min(100, Number(value)));
+  const thumbTravel = Math.max(0, entrySlider.clientWidth - 60);
+  entrySlider.style.setProperty('--slide-progress', `${progress}%`);
+  entrySlider.style.setProperty('--thumb-x', `${thumbTravel * progress / 100}px`);
+}
+
+function revealDashboard() {
+  if (!landing || landing.classList.contains('landing--leaving')) return;
+  landing.classList.add('landing--leaving');
+  enterDashboard.disabled = true;
+  entrySlider.classList.add('landing__slider--complete');
+  document.getElementById('entry-slider-label').textContent = 'Connecting to operations';
+  document.body.classList.add('dashboard-entering');
+
+  window.setTimeout(() => {
+    document.body.classList.remove('landing-active', 'dashboard-entering');
+    document.body.classList.add('dashboard-revealed');
+    landing.remove();
+    map.resize();
+  }, 1650);
+}
+
+enterDashboard?.addEventListener('input', () => {
+  paintSlider(enterDashboard.value);
+  entrySlider.classList.toggle('landing__slider--moving', Number(enterDashboard.value) > 4);
+  window.clearTimeout(sliderResetTimer);
+  if (Number(enterDashboard.value) >= 96) revealDashboard();
+});
+
+enterDashboard?.addEventListener('change', () => {
+  if (Number(enterDashboard.value) >= 96) return;
+  sliderResetTimer = window.setTimeout(() => {
+    enterDashboard.value = 0;
+    paintSlider(0);
+    entrySlider.classList.remove('landing__slider--moving');
+  }, 120);
+});
+
+function sliderValueFromPointer(clientX) {
+  const rect = entrySlider.getBoundingClientRect();
+  const travel = Math.max(1, rect.width - 60);
+  return Math.max(0, Math.min(100, ((clientX - rect.left - 30) / travel) * 100));
+}
+
+entrySlider?.addEventListener('pointerdown', (event) => {
+  if (enterDashboard.disabled) return;
+  const rect = entrySlider.getBoundingClientRect();
+  const thumbX = rect.left + 30 + (rect.width - 60) * Number(enterDashboard.value) / 100;
+  if (Math.abs(event.clientX - thumbX) > 38) return;
+  sliderDragging = true;
+  entrySlider.setPointerCapture(event.pointerId);
+  entrySlider.classList.add('landing__slider--moving');
+});
+
+entrySlider?.addEventListener('pointermove', (event) => {
+  if (!sliderDragging) return;
+  enterDashboard.value = String(sliderValueFromPointer(event.clientX));
+  paintSlider(enterDashboard.value);
+  if (Number(enterDashboard.value) >= 96) revealDashboard();
+});
+
+entrySlider?.addEventListener('pointerup', (event) => {
+  if (!sliderDragging) return;
+  sliderDragging = false;
+  entrySlider.releasePointerCapture(event.pointerId);
+  if (Number(enterDashboard.value) < 96) {
+    enterDashboard.value = 0;
+    paintSlider(0);
+    entrySlider.classList.remove('landing__slider--moving');
+  }
+});
+
+enterDashboard?.addEventListener('keydown', (event) => {
+  const keys = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 };
+  if (!(event.key in keys) && event.key !== 'Home' && event.key !== 'End') return;
+  event.preventDefault();
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? 100 : Number(enterDashboard.value) + keys[event.key];
+  enterDashboard.value = String(Math.max(0, Math.min(100, next)));
+  paintSlider(enterDashboard.value);
+  entrySlider.classList.toggle('landing__slider--moving', Number(enterDashboard.value) > 4);
+  if (Number(enterDashboard.value) >= 96) revealDashboard();
+});
+
+window.addEventListener('resize', () => paintSlider(enterDashboard?.value || 0));
+
+// Let keyboard users move into the product just as fluidly.
+landing?.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') revealDashboard();
+});
+
+// ---------------------------------------------------------------------------
 // Map bootstrap — 3D skyline foundation adapted from "The Skyline Project"
 // (github.com/perlakay/nyc-building-history, MIT © Perla Dahan).
 // ---------------------------------------------------------------------------

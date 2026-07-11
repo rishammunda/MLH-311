@@ -6,7 +6,44 @@
     <title>SF311 Live Triage · Operations</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
-  <body>
+  <body class="landing-active">
+    <section class="landing" id="landing" aria-label="SF311 Live Triage introduction">
+      <video class="landing__video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
+        <source src="/hero-loop.mp4" type="video/mp4" />
+      </video>
+      <div class="landing__wash" aria-hidden="true"></div>
+      <div class="landing__grid" aria-hidden="true"></div>
+
+      <header class="landing__nav">
+        <a class="landing__brand" href="#" aria-label="SF311 Live Triage home">
+          <span class="landing__mark">311</span>
+          <span>SF311 <b>Live Triage</b></span>
+        </a>
+        <div class="landing__status"><i></i> City systems online</div>
+      </header>
+
+      <div class="landing__content">
+        <div class="landing__eyebrow"><span>AI-POWERED OPERATIONS</span><span>SAN FRANCISCO</span></div>
+        <h1>Every report.<br /><em>Right response.</em></h1>
+        <p>From incoming call to crew dispatch in seconds. AI triages, prioritizes, and maps every 311 request as it happens.</p>
+        <div class="landing__slider" id="entry-slider">
+          <span class="landing__slider-label" id="entry-slider-label">Slide to enter live operations</span>
+          <input id="enter-dashboard" type="range" min="0" max="100" step="5" value="0" aria-labelledby="entry-slider-label" />
+        </div>
+      </div>
+
+      <div class="landing__foot">
+        <span>01 / LIVE CITY INTELLIGENCE</span>
+        <span class="landing__scroll"><i></i> Built for the people who keep cities moving</span>
+      </div>
+
+      <div class="landing__transition" aria-hidden="true">
+        <span class="landing__transition-mark">311</span>
+        <span class="landing__transition-copy">Opening operations</span>
+        <span class="landing__transition-line"></span>
+      </div>
+    </section>
+
     <div id="map"></div>
 
     <!-- Top bar: brand + live stat tiles -->

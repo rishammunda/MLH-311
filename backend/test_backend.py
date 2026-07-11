@@ -1,8 +1,8 @@
 """Backend tests. Run: cd backend && . .venv/bin/activate && pytest -q
 
-No network or ANTHROPIC_API_KEY needed — the SODA fetch and the Claude labeler
-are monkeypatched. Covers dedupe, retry, concurrent labeling, store scoring,
-and the API endpoints.
+No network or DIGITALOCEAN_INFERENCE_KEY needed — the SODA fetch and the
+DigitalOcean Gradient AI labeler are monkeypatched. Covers dedupe, retry,
+concurrent labeling, store scoring, and the API endpoints.
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import ingest
+import labeler
 import main
 import store
 from models import AILabel, Case
@@ -94,6 +95,71 @@ def test_surge_escalates_and_adds_duplicates():
 
 def test_surge_unknown_case_returns_none():
     assert store.simulate_surge("does-not-exist", 3) is None
+
+
+# ----------------------------- labeler (DigitalOcean) -----------------------------
+
+def test_extract_json_bare():
+    d = labeler._extract_json('{"ai_category": "pothole", "safety_risk": true}')
+    assert d["ai_category"] == "pothole"
+
+
+def test_extract_json_fenced():
+    text = '```json\n{"ai_category": "graffiti", "ai_urgency": "low"}\n```'
+    assert labeler._extract_json(text)["ai_category"] == "graffiti"
+
+
+def test_extract_json_with_surrounding_prose():
+    text = 'Sure! Here is the classification:\n{"ai_category": "water_leak"}\nHope that helps.'
+    assert labeler._extract_json(text)["ai_category"] == "water_leak"
+
+
+class _FakeChoice:
+    def __init__(self, content):
+        self.message = type("M", (), {"content": content})()
+
+
+class _FakeCompletion:
+    def __init__(self, content):
+        self.choices = [_FakeChoice(content)]
+
+
+def test_label_case_parses_do_response(monkeypatch):
+    payload = (
+        '{"ai_category": "pothole", "ai_urgency": "high", '
+        '"ai_summary": "big pothole", "safety_risk": true}'
+    )
+
+    class _FakeClient:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    # sanity: we call the DO model slug
+                    assert kwargs["model"] == labeler.DO_MODEL
+                    return _FakeCompletion(payload)
+
+    monkeypatch.setattr(labeler, "_get_client", lambda: _FakeClient())
+    lbl = labeler.label_case(_case("A", details="huge pothole, cars swerving"))
+    assert lbl.ai_category == "pothole"
+    assert lbl.ai_urgency == "high"
+    assert lbl.safety_risk is True
+
+
+def test_label_case_falls_back_on_error(monkeypatch):
+    class _BoomClient:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    raise RuntimeError("DO inference down")
+
+    monkeypatch.setattr(labeler, "_get_client", lambda: _BoomClient())
+    lbl = labeler.label_case(_case("A", details="something"))
+    # Safe default so the case is never dropped.
+    assert lbl.ai_category == "other"
+    assert lbl.ai_urgency == "low"
+    assert lbl.ai_summary  # non-empty summary from the raw text
 
 
 # ----------------------------- ingest: dedupe -----------------------------

@@ -26,7 +26,7 @@ Multiple reports on the same issue escalate the pin from yellow → orange → *
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env          # add ANTHROPIC_API_KEY
+cp .env.example .env          # add DIGITALOCEAN_INFERENCE_KEY
 uvicorn main:app --reload --port 8000
 # → http://localhost:8000/cases
 ```

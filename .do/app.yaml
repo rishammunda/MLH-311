@@ -3,7 +3,8 @@
 # (or paste into the DO dashboard: Apps > Create > from this repo)
 #
 # Fill in `repo` with your GitHub slug once pushed (e.g. rishammunda/MLH-311),
-# and set ANTHROPIC_API_KEY as an encrypted secret in the DO dashboard.
+# and set DIGITALOCEAN_INFERENCE_KEY (a Gradient AI model access key) as an
+# encrypted secret in the DO dashboard.
 
 name: sf311-live-triage
 region: sfo
@@ -23,9 +24,12 @@ services:
     routes:
       - path: /api
     envs:
-      - key: ANTHROPIC_API_KEY
+      - key: DIGITALOCEAN_INFERENCE_KEY
         scope: RUN_TIME
         type: SECRET
+      - key: DO_MODEL
+        scope: RUN_TIME
+        value: "openai-gpt-oss-20b"
       - key: SF_APP_TOKEN
         scope: RUN_TIME
         value: ""

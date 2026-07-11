@@ -42,7 +42,7 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 
 # Bound how many cases we label concurrently so a big batch doesn't fire dozens
-# of Anthropic API calls at once.
+# of inference API calls at once.
 _LABEL_CONCURRENCY = int(os.getenv("LABEL_CONCURRENCY", "5"))
 
 

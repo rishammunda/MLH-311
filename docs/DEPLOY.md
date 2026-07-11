@@ -10,8 +10,8 @@ Two options. The App Platform path is the fastest for a hackathon.
 3. DO detects two components from [.do/app.yaml](../.do/app.yaml):
    - **backend** (Python service) — runs `uvicorn main:app`.
    - **frontend** (static site) — builds the Vite app to `dist/`.
-4. Set **`ANTHROPIC_API_KEY`** as an encrypted env var on the backend component.
-   (Optionally set `SF_APP_TOKEN`.)
+4. Set **`DIGITALOCEAN_INFERENCE_KEY`** (a Gradient AI model access key) as an encrypted
+   env var on the backend component. (Optionally set `SF_APP_TOKEN`, `DO_MODEL`.)
 5. Deploy. DO gives you a public URL like
    `https://sf311-live-triage-xxxxx.ondigitalocean.app`.
 

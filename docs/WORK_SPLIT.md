@@ -12,10 +12,10 @@ Tasks:
 - [ ] FastAPI app skeleton (`/health`, `/cases`). Rate limiting (SlowAPI or simple middleware).
 - [ ] SODA ingest: pull recent cases from `https://data.sfgov.org/resource/vw6y-z8j6.json`.
   Normalize into our case shape. Drop cases without lat/long.
-- [ ] AI labeler using Claude (`claude-haiku-4-5`): given raw case text, return strict JSON
+- [ ] AI labeler using DigitalOcean Gradient AI (`openai-gpt-oss-20b`): given raw case text, return JSON
   (`category`, `urgency`, `summary`, `safety_risk`). Validate against schema. Batch to control cost.
 - [ ] Commit a realistic `frontend/src/mockCases.json` EARLY so Risham is unblocked.
-- [ ] `.env.example` with `ANTHROPIC_API_KEY`, `SF_APP_TOKEN` (optional), `DATABASE_URL`.
+- [ ] `.env.example` with `DIGITALOCEAN_INFERENCE_KEY`, `SF_APP_TOKEN` (optional), `DATABASE_URL`.
 
 Hand-off to Raghav: labeled case objects (pre-clustering).
 
@@ -56,7 +56,7 @@ Tasks:
 ## Shared / hour 0 checklist
 
 - [ ] Risham creates the repo, adds Shaaz + Raghav.
-- [ ] Shaaz shares `ANTHROPIC_API_KEY` securely (not committed). Register a free Socrata app
+- [ ] Shaaz shares `DIGITALOCEAN_INFERENCE_KEY` securely (not committed). Register a free Socrata app
       token for higher SODA limits (optional).
 - [ ] Raghav creates the DO project + Managed Postgres early (provisioning takes time).
 - [ ] Agree the case shape is FROZEN per the API contract.
